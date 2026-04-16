@@ -1,0 +1,226 @@
+/**
+ * DB Debug Manager — Admin styles
+ * Utilizza le variabili CSS del design system db-admin-ui.
+ */
+
+.dbdm-wrap .dbdm-tabs {
+    margin-bottom: 20px;
+}
+
+.dbdm-const-table code {
+    font-size: 13px;
+    background: var(--db-bg-subtle);
+    padding: 2px 6px;
+    border-radius: var(--db-radius-sm);
+}
+
+.dbdm-const-table .dbdm-desc {
+    color: var(--db-text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.dbdm-form-footer {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--db-border-light);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.dbdm-form-footer .db-ui-text-muted {
+    color: var(--db-text-muted);
+    font-size: 12px;
+    flex: 1;
+}
+
+/* Log viewer */
+.dbdm-log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.dbdm-log-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.dbdm-inline-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--db-text-muted);
+}
+
+.dbdm-inline-label select {
+    margin-left: 4px;
+}
+
+.dbdm-log-search {
+    margin-bottom: 12px;
+}
+
+.dbdm-log-search input[type="text"] {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--db-border);
+    border-radius: var(--db-radius-sm);
+    font-size: 13px;
+}
+
+.dbdm-log-viewer {
+    background: #1e1e1e;
+    color: #e8e8e8;
+    padding: 16px;
+    border-radius: var(--db-radius);
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    max-height: 600px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+}
+
+/* Query monitor */
+.dbdm-snap-meta {
+    padding: 10px 12px;
+    background: var(--db-bg-subtle);
+    border-radius: var(--db-radius-sm);
+    margin-bottom: 16px;
+    font-size: 13px;
+}
+
+.dbdm-q-table {
+    font-size: 12px;
+}
+
+.dbdm-q-sql {
+    display: block;
+    max-width: 600px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+}
+
+.dbdm-q-stack {
+    display: block;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 11px;
+    color: var(--db-text-muted);
+}
+
+.dbdm-q-slow {
+    background: var(--db-warning-light) !important;
+}
+
+.dbdm-q-slow td {
+    font-weight: 600;
+}
+
+@media (max-width: 782px) {
+    .dbdm-log-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .dbdm-log-viewer {
+        font-size: 11px;
+        max-height: 400px;
+    }
+}
+
+/* Snapshots */
+.dbdm-snapshots {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.dbdm-snap-card {
+    border: 1px solid var(--db-border);
+    border-radius: var(--db-radius);
+    padding: 14px 16px;
+    background: var(--db-bg);
+}
+
+.dbdm-snap-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.dbdm-snap-head strong {
+    font-size: 14px;
+}
+
+.dbdm-snap-note {
+    padding: 8px 12px;
+    background: var(--db-primary-light);
+    border-radius: var(--db-radius-sm);
+    font-size: 13px;
+    margin-bottom: 10px;
+    color: var(--db-primary);
+}
+
+.dbdm-snap-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--db-text-muted);
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.dbdm-snap-diff {
+    background: var(--db-bg-subtle);
+    border-left: 3px solid var(--db-warning);
+    padding: 10px 14px;
+    border-radius: var(--db-radius-sm);
+    font-size: 12px;
+    margin-bottom: 12px;
+}
+
+.dbdm-snap-diff strong {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--db-warning-dark);
+}
+
+.dbdm-snap-diff ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.dbdm-snap-diff li {
+    margin: 3px 0;
+}
+
+.dbdm-plugin-list {
+    color: var(--db-text-muted);
+    font-style: italic;
+    word-break: break-word;
+}
+
+.dbdm-snap-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding-top: 10px;
+    border-top: 1px solid var(--db-border-light);
+}
