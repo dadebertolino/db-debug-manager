@@ -122,26 +122,73 @@ class DBDM_Standalone_Config {
     }
 
     /**
-     * Verifica sintassi PHP di una stringa via `php -l` su file temporaneo.
-     * Ritorna true se ok (o se exec non disponibile: best effort), stringa
-     * di errore altrimenti. Nessuna dipendenza WP.
+     * Verifica sintassi PHP di una stringa via `-l` su file temporaneo.
+     * Ritorna true se ok (o se il lint non è eseguibile: best effort),
+     * stringa di errore altrimenti. Nessuna dipendenza WP.
+     *
+     * Nota: nel contesto web PHP_BINARY punta spesso a php-fpm, che NON
+     * supporta il lint e fallisce sempre (falsi "errore di sintassi").
+     * Per questo il binario viene prima calibrato: deve dare exit 0 su
+     * codice valido ed exit != 0 su codice rotto, altrimenti si passa
+     * al candidato successivo o si salta il lint.
      */
     public static function php_lint_string($content) {
         if (!function_exists('exec')) {
             return true; // skip se exec disabilitata
         }
-        $tmp = tempnam(sys_get_temp_dir(), 'dbdm-lint');
-        if (!$tmp || file_put_contents($tmp, $content) === false) {
-            return true; // impossibile testare: non bloccare
+        $php = self::lint_binary();
+        if ($php === '') {
+            return true; // nessun binario in grado di lintare: non bloccare
         }
-        $php = defined('PHP_BINARY') && PHP_BINARY ? PHP_BINARY : 'php';
-        $cmd = escapeshellarg($php) . ' -l ' . escapeshellarg($tmp) . ' 2>&1';
-        @exec($cmd, $output, $code);
-        @unlink($tmp);
+        $code = self::run_lint($php, $content);
         if ($code !== 0) {
             return 'Errore di sintassi rilevato. Modifica annullata.';
         }
         return true;
+    }
+
+    /**
+     * Esegue `binario -l` sul contenuto (via file temporaneo).
+     * Ritorna l'exit code, o -1 se impossibile eseguire.
+     */
+    private static function run_lint($php, $content) {
+        $tmp = tempnam(sys_get_temp_dir(), 'dbdm-lint');
+        if (!$tmp || file_put_contents($tmp, $content) === false) {
+            return -1;
+        }
+        $cmd = escapeshellarg($php) . ' -l ' . escapeshellarg($tmp) . ' 2>&1';
+        @exec($cmd, $output, $code);
+        @unlink($tmp);
+        return is_int($code) ? $code : -1;
+    }
+
+    /**
+     * Trova un binario PHP capace di lintare. Ritorna '' se nessuno.
+     * Calibrazione: exit 0 su "<?php" valido E exit != 0 su codice rotto.
+     */
+    private static function lint_binary() {
+        static $resolved = null;
+        if ($resolved !== null) {
+            return $resolved;
+        }
+
+        $candidates = array();
+        if (defined('PHP_BINARY') && PHP_BINARY) {
+            // php-fpm non supporta -l: escluso a priori.
+            if (stripos(basename(PHP_BINARY), 'fpm') === false) {
+                $candidates[] = PHP_BINARY;
+            }
+        }
+        $candidates[] = 'php'; // CLI di sistema nel PATH
+
+        foreach (array_unique($candidates) as $php) {
+            $ok_valid  = self::run_lint($php, "<?php\n\$dbdm = 1;\n");
+            $ok_broken = self::run_lint($php, "<?php\ndefine('X', true;\n");
+            if ($ok_valid === 0 && $ok_broken > 0) {
+                return $resolved = $php;
+            }
+        }
+        return $resolved = '';
     }
 
     /**

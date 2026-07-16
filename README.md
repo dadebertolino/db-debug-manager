@@ -3,7 +3,7 @@
 Plugin WordPress per gestire il debug direttamente dal pannello di amministrazione, senza più aprire l'FTP per modificare `wp-config.php` o scaricare `debug.log`. Include un **sistema di accesso emergency standalone** che funziona anche quando WordPress è crashato.
 
 **Autore:** Davide Bertolino · [davidebertolino.it](https://www.davidebertolino.it)
-**Versione:** 1.3.0
+**Versione:** 1.3.1
 **Licenza:** GPL v2 or later
 
 ---
@@ -155,6 +155,9 @@ db-debug-manager/
 ```
 
 ## Changelog
+
+### 1.3.1 — 2026-07-16
+- **Fix:** falsi "Errore di sintassi rilevato" su hosting PHP-FPM: `PHP_BINARY` puntava a php-fpm, che non supporta il lint e falliva su qualsiasi contenuto, bloccando ogni salvataggio delle costanti. Il binario di lint viene ora calibrato (deve accettare codice valido e rifiutare codice rotto) con fallback al `php` CLI di sistema; se nessun binario è utilizzabile il lint viene saltato (best effort, come con `exec` disabilitata).
 
 ### 1.3.0 — 2026-07-16
 - **Pulizia:** rimosso il codice morto della gestione sessioni su file (`session_path()`, `emergency-sessions.json`): l'emergency usa le sessioni PHP native da sempre.
