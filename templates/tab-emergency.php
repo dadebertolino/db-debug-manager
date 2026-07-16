@@ -86,6 +86,16 @@ $log_entries   = DBDM_Emergency::get_log_entries(50);
                 <?php esc_html_e('Quando disattivato, emergency.php restituisce un errore anche con la password corretta. Tienilo spento tranne quando serve davvero.', 'db-debug-manager'); ?>
             </p>
 
+            <p>
+                <label>
+                    <input type="checkbox" name="dbdm_trust_proxy" value="1" <?php checked(DBDM_Emergency::trusts_proxy()); ?>>
+                    <strong><?php esc_html_e('Il sito è dietro un proxy/CDN fidato (es. Cloudflare)', 'db-debug-manager'); ?></strong>
+                </label>
+            </p>
+            <p class="description" style="color:var(--db-text-muted); font-size:12px;">
+                <?php esc_html_e('Attivalo SOLO se tutto il traffico passa da un reverse proxy o CDN: in quel caso emergency.php userà gli header del proxy (CF-Connecting-IP, X-Forwarded-For) per identificare l\'IP reale nel rate-limit e nei log. Se il sito NON è dietro proxy, lascialo disattivato: quegli header sono falsificabili e permetterebbero di aggirare il blocco tentativi.', 'db-debug-manager'); ?>
+            </p>
+
             <div class="dbdm-form-footer">
                 <button type="submit" class="db-ui-btn db-ui-btn-primary">
                     <?php esc_html_e('Salva impostazioni', 'db-debug-manager'); ?>

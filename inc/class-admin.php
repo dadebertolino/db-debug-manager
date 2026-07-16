@@ -203,6 +203,9 @@ class DBDM_Admin {
             DBDM_Emergency::set_enabled(false);
         }
 
+        // Modalità proxy fidato (indipendente dagli errori password).
+        DBDM_Emergency::set_trust_proxy(!empty($_POST['dbdm_trust_proxy']));
+
         $args = array(
             'page' => DBDM_SLUG,
             'tab'  => 'emergency',

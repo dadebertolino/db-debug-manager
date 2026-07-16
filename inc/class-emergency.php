@@ -8,9 +8,10 @@ if (!defined('ABSPATH')) exit;
 
 class DBDM_Emergency {
 
-    const OPTION_HASH    = 'dbdm_emergency_hash';
-    const OPTION_ENABLED = 'dbdm_emergency_enabled';
-    const MIN_PWD_LEN    = 12;
+    const OPTION_HASH        = 'dbdm_emergency_hash';
+    const OPTION_ENABLED     = 'dbdm_emergency_enabled';
+    const OPTION_TRUST_PROXY = 'dbdm_emergency_trust_proxy';
+    const MIN_PWD_LEN        = 12;
 
     public static function is_enabled() {
         return (bool) get_option(self::OPTION_ENABLED, false);
@@ -18,6 +19,19 @@ class DBDM_Emergency {
 
     public static function set_enabled($enabled) {
         update_option(self::OPTION_ENABLED, (bool) $enabled, false);
+    }
+
+    /**
+     * True se il sito è dichiarato dietro un proxy/CDN fidato:
+     * emergency.php userà gli header proxy per risalire all'IP client.
+     * Default false: si usa solo REMOTE_ADDR (non falsificabile).
+     */
+    public static function trusts_proxy() {
+        return (bool) get_option(self::OPTION_TRUST_PROXY, false);
+    }
+
+    public static function set_trust_proxy($trust) {
+        update_option(self::OPTION_TRUST_PROXY, (bool) $trust, false);
     }
 
     public static function has_password() {

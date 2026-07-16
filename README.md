@@ -101,7 +101,7 @@ Gli snapshot mostrano il **diff** rispetto allo stato attuale (quale plugin è s
 
 **Sicurezza dell'emergency:**
 - Default **disattivato**. Finché non lo attivi esplicitamente, `emergency.php` risponde con errore anche con password giusta.
-- Dopo 5 tentativi falliti, IP bloccato per 15 minuti.
+- Dopo 5 tentativi falliti, IP bloccato per 15 minuti. L'IP è `REMOTE_ADDR` (non falsificabile); se il sito è dietro proxy/CDN, attiva l'opzione dedicata per usare gli header del proxy.
 - Ogni tentativo (login, successo, blocco, azione) viene loggato con IP e User-Agent.
 - Sessione 30 minuti, cookie HttpOnly + SameSite=Strict.
 - CSRF token su ogni azione distruttiva.
@@ -157,6 +157,7 @@ db-debug-manager/
 
 ### 1.2.1 — 2026-07-16
 - **Sicurezza (importante):** il backup di `wp-config.php` viene ora salvato in `private/wp-config.dbdm-bak` (cartella con deny-all) invece che accanto a `wp-config.php`, dove poteva essere scaricato come testo semplice esponendo le credenziali del database.
+- **Sicurezza (importante):** il rate-limit dell'emergency access ora usa `REMOTE_ADDR` invece degli header `X-Forwarded-For` / `CF-Connecting-IP`, che sono falsificabili dal client e permettevano di aggirare il blocco tentativi. Se il sito è dietro un proxy/CDN fidato, attiva la nuova opzione nella tab Emergency per usare gli header del proxy (viene letto l'ultimo hop di X-Forwarded-For, non il primo).
 - **Migrazione:** il vecchio backup `wp-config.php.dbdm-bak` nella webroot viene eliminato automaticamente alla prima apertura del pannello o alla prima modifica delle costanti. Se hai usato versioni ≤ 1.2.0, verifica comunque che il file non sia più presente.
 
 ### 1.2.0 — 2026-04-16

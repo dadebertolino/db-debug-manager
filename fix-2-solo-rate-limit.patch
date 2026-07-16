@@ -1,0 +1,152 @@
+diff --git a/README.md b/README.md
+index 0badc3b..08e9494 100644
+--- a/README.md
++++ b/README.md
+@@ -101,7 +101,7 @@ Gli snapshot mostrano il **diff** rispetto allo stato attuale (quale plugin è s
+ 
+ **Sicurezza dell'emergency:**
+ - Default **disattivato**. Finché non lo attivi esplicitamente, `emergency.php` risponde con errore anche con password giusta.
+-- Dopo 5 tentativi falliti, IP bloccato per 15 minuti.
++- Dopo 5 tentativi falliti, IP bloccato per 15 minuti. L'IP è `REMOTE_ADDR` (non falsificabile); se il sito è dietro proxy/CDN, attiva l'opzione dedicata per usare gli header del proxy.
+ - Ogni tentativo (login, successo, blocco, azione) viene loggato con IP e User-Agent.
+ - Sessione 30 minuti, cookie HttpOnly + SameSite=Strict.
+ - CSRF token su ogni azione distruttiva.
+@@ -157,6 +157,7 @@ db-debug-manager/
+ 
+ ### 1.2.1 — 2026-07-16
+ - **Sicurezza (importante):** il backup di `wp-config.php` viene ora salvato in `private/wp-config.dbdm-bak` (cartella con deny-all) invece che accanto a `wp-config.php`, dove poteva essere scaricato come testo semplice esponendo le credenziali del database.
++- **Sicurezza (importante):** il rate-limit dell'emergency access ora usa `REMOTE_ADDR` invece degli header `X-Forwarded-For` / `CF-Connecting-IP`, che sono falsificabili dal client e permettevano di aggirare il blocco tentativi. Se il sito è dietro un proxy/CDN fidato, attiva la nuova opzione nella tab Emergency per usare gli header del proxy (viene letto l'ultimo hop di X-Forwarded-For, non il primo).
+ - **Migrazione:** il vecchio backup `wp-config.php.dbdm-bak` nella webroot viene eliminato automaticamente alla prima apertura del pannello o alla prima modifica delle costanti. Se hai usato versioni ≤ 1.2.0, verifica comunque che il file non sia più presente.
+ 
+ ### 1.2.0 — 2026-04-16
+diff --git a/emergency.php b/emergency.php
+index 30ecb39..8863216 100644
+--- a/emergency.php
++++ b/emergency.php
+@@ -60,15 +60,38 @@ define('DBDM_EMERGENCY_RL',     DBDM_EMERGENCY_PRIVATE_DIR . 'emergency-ratelimi
+ require_once __DIR__ . '/inc/class-standalone-config.php';
+ 
+ // ========= HELPER =========
++// Flag impostato dopo la lettura delle opzioni dal DB (vedi VERIFICA ATTIVAZIONE).
++$GLOBALS['dbdm_em_trust_proxy'] = false;
++
++/**
++ * IP del client per rate-limit e log.
++ *
++ * Di default usa SOLO REMOTE_ADDR: gli header X-Forwarded-For e
++ * CF-Connecting-IP sono impostabili liberamente dal client e permetterebbero
++ * di aggirare il rate-limit ruotando IP fittizi.
++ *
++ * Se l'admin ha attivato "sito dietro proxy/CDN fidato" (opzione
++ * dbdm_emergency_trust_proxy), si usano gli header del proxy:
++ * - CF-Connecting-IP se presente (impostato/sovrascritto da Cloudflare);
++ * - altrimenti l'ULTIMO valore di X-Forwarded-For, cioè quello aggiunto
++ *   dal proxy fidato più vicino al server (il primo è controllato dal client).
++ */
+ function dbdm_em_ip() {
+-    $candidates = array('HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR');
+-    foreach ($candidates as $k) {
+-        if (!empty($_SERVER[$k])) {
+-            $ip = explode(',', $_SERVER[$k])[0];
+-            $ip = trim($ip);
++    if (!empty($GLOBALS['dbdm_em_trust_proxy'])) {
++        if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
++            $ip = trim($_SERVER['HTTP_CF_CONNECTING_IP']);
++            if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
++        }
++        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
++            $parts = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
++            $ip = trim(end($parts));
+             if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
+         }
+     }
++    if (!empty($_SERVER['REMOTE_ADDR'])) {
++        $ip = trim($_SERVER['REMOTE_ADDR']);
++        if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
++    }
+     return '0.0.0.0';
+ }
+ 
+@@ -198,6 +221,9 @@ if (empty($stored_hash)) {
+     exit;
+ }
+ 
++// Modalità proxy fidato: da qui in poi dbdm_em_ip() può usare gli header proxy.
++$GLOBALS['dbdm_em_trust_proxy'] = (bool) dbdm_em_get_option($pdo, $prefix, 'dbdm_emergency_trust_proxy', false);
++
+ // ========= ROUTING =========
+ $ip = dbdm_em_ip();
+ $action = isset($_REQUEST['a']) ? preg_replace('/[^a-z_]/', '', $_REQUEST['a']) : '';
+diff --git a/inc/class-admin.php b/inc/class-admin.php
+index 45bd7ef..dad5dda 100644
+--- a/inc/class-admin.php
++++ b/inc/class-admin.php
+@@ -203,6 +203,9 @@ class DBDM_Admin {
+             DBDM_Emergency::set_enabled(false);
+         }
+ 
++        // Modalità proxy fidato (indipendente dagli errori password).
++        DBDM_Emergency::set_trust_proxy(!empty($_POST['dbdm_trust_proxy']));
++
+         $args = array(
+             'page' => DBDM_SLUG,
+             'tab'  => 'emergency',
+diff --git a/inc/class-emergency.php b/inc/class-emergency.php
+index 7e1c346..6b6f782 100644
+--- a/inc/class-emergency.php
++++ b/inc/class-emergency.php
+@@ -8,9 +8,10 @@ if (!defined('ABSPATH')) exit;
+ 
+ class DBDM_Emergency {
+ 
+-    const OPTION_HASH    = 'dbdm_emergency_hash';
+-    const OPTION_ENABLED = 'dbdm_emergency_enabled';
+-    const MIN_PWD_LEN    = 12;
++    const OPTION_HASH        = 'dbdm_emergency_hash';
++    const OPTION_ENABLED     = 'dbdm_emergency_enabled';
++    const OPTION_TRUST_PROXY = 'dbdm_emergency_trust_proxy';
++    const MIN_PWD_LEN        = 12;
+ 
+     public static function is_enabled() {
+         return (bool) get_option(self::OPTION_ENABLED, false);
+@@ -20,6 +21,19 @@ class DBDM_Emergency {
+         update_option(self::OPTION_ENABLED, (bool) $enabled, false);
+     }
+ 
++    /**
++     * True se il sito è dichiarato dietro un proxy/CDN fidato:
++     * emergency.php userà gli header proxy per risalire all'IP client.
++     * Default false: si usa solo REMOTE_ADDR (non falsificabile).
++     */
++    public static function trusts_proxy() {
++        return (bool) get_option(self::OPTION_TRUST_PROXY, false);
++    }
++
++    public static function set_trust_proxy($trust) {
++        update_option(self::OPTION_TRUST_PROXY, (bool) $trust, false);
++    }
++
+     public static function has_password() {
+         $h = get_option(self::OPTION_HASH, '');
+         return !empty($h);
+diff --git a/templates/tab-emergency.php b/templates/tab-emergency.php
+index 034ebee..14327e7 100644
+--- a/templates/tab-emergency.php
++++ b/templates/tab-emergency.php
+@@ -86,6 +86,16 @@ $log_entries   = DBDM_Emergency::get_log_entries(50);
+                 <?php esc_html_e('Quando disattivato, emergency.php restituisce un errore anche con la password corretta. Tienilo spento tranne quando serve davvero.', 'db-debug-manager'); ?>
+             </p>
+ 
++            <p>
++                <label>
++                    <input type="checkbox" name="dbdm_trust_proxy" value="1" <?php checked(DBDM_Emergency::trusts_proxy()); ?>>
++                    <strong><?php esc_html_e('Il sito è dietro un proxy/CDN fidato (es. Cloudflare)', 'db-debug-manager'); ?></strong>
++                </label>
++            </p>
++            <p class="description" style="color:var(--db-text-muted); font-size:12px;">
++                <?php esc_html_e('Attivalo SOLO se tutto il traffico passa da un reverse proxy o CDN: in quel caso emergency.php userà gli header del proxy (CF-Connecting-IP, X-Forwarded-For) per identificare l\'IP reale nel rate-limit e nei log. Se il sito NON è dietro proxy, lascialo disattivato: quegli header sono falsificabili e permetterebbero di aggirare il blocco tentativi.', 'db-debug-manager'); ?>
++            </p>
++
+             <div class="dbdm-form-footer">
+                 <button type="submit" class="db-ui-btn db-ui-btn-primary">
+                     <?php esc_html_e('Salva impostazioni', 'db-debug-manager'); ?>

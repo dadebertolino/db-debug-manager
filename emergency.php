@@ -60,14 +60,37 @@ define('DBDM_EMERGENCY_RL',     DBDM_EMERGENCY_PRIVATE_DIR . 'emergency-ratelimi
 require_once __DIR__ . '/inc/class-standalone-config.php';
 
 // ========= HELPER =========
+// Flag impostato dopo la lettura delle opzioni dal DB (vedi VERIFICA ATTIVAZIONE).
+$GLOBALS['dbdm_em_trust_proxy'] = false;
+
+/**
+ * IP del client per rate-limit e log.
+ *
+ * Di default usa SOLO REMOTE_ADDR: gli header X-Forwarded-For e
+ * CF-Connecting-IP sono impostabili liberamente dal client e permetterebbero
+ * di aggirare il rate-limit ruotando IP fittizi.
+ *
+ * Se l'admin ha attivato "sito dietro proxy/CDN fidato" (opzione
+ * dbdm_emergency_trust_proxy), si usano gli header del proxy:
+ * - CF-Connecting-IP se presente (impostato/sovrascritto da Cloudflare);
+ * - altrimenti l'ULTIMO valore di X-Forwarded-For, cioè quello aggiunto
+ *   dal proxy fidato più vicino al server (il primo è controllato dal client).
+ */
 function dbdm_em_ip() {
-    $candidates = array('HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR');
-    foreach ($candidates as $k) {
-        if (!empty($_SERVER[$k])) {
-            $ip = explode(',', $_SERVER[$k])[0];
-            $ip = trim($ip);
+    if (!empty($GLOBALS['dbdm_em_trust_proxy'])) {
+        if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+            $ip = trim($_SERVER['HTTP_CF_CONNECTING_IP']);
             if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
         }
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $parts = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $ip = trim(end($parts));
+            if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
+        }
+    }
+    if (!empty($_SERVER['REMOTE_ADDR'])) {
+        $ip = trim($_SERVER['REMOTE_ADDR']);
+        if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
     }
     return '0.0.0.0';
 }
@@ -197,6 +220,9 @@ if (empty($stored_hash)) {
     dbdm_em_render_error('Nessuna password emergency configurata.');
     exit;
 }
+
+// Modalità proxy fidato: da qui in poi dbdm_em_ip() può usare gli header proxy.
+$GLOBALS['dbdm_em_trust_proxy'] = (bool) dbdm_em_get_option($pdo, $prefix, 'dbdm_emergency_trust_proxy', false);
 
 // ========= ROUTING =========
 $ip = dbdm_em_ip();
