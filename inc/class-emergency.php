@@ -70,6 +70,15 @@ class DBDM_Emergency {
     }
 
     /**
+     * Path della cartella private/ (con trailing slash), garantendone
+     * esistenza e protezione. Riusabile dalle altre classi del plugin.
+     */
+    public static function private_dir() {
+        self::ensure_private_dir();
+        return DBDM_PLUGIN_DIR . 'private/';
+    }
+
+    /**
      * Crea la cartella private/ con protezioni (htaccess + index).
      */
     private static function ensure_private_dir() {

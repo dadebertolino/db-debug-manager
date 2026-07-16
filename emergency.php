@@ -407,7 +407,12 @@ function dbdm_em_toggle_constant($config_path, $name, $value) {
     $content = file_get_contents($config_path);
     if ($content === false) return 'lettura fallita';
 
-    @copy($config_path, $config_path . '.dbdm-bak');
+    // Backup in private/ (deny-all), MAI accanto a wp-config.php nella webroot.
+    @copy($config_path, DBDM_EMERGENCY_PRIVATE_DIR . 'wp-config.dbdm-bak');
+    // Rimuove l'eventuale backup legacy esposto (versioni <= 1.2.0).
+    if (file_exists($config_path . '.dbdm-bak')) {
+        @unlink($config_path . '.dbdm-bak');
+    }
 
     $php_value = $value ? 'true' : 'false';
     $new_line  = "define('{$name}', {$php_value});";

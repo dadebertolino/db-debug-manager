@@ -1,0 +1,174 @@
+diff --git a/README.md b/README.md
+index df458c9..0badc3b 100644
+--- a/README.md
++++ b/README.md
+@@ -3,7 +3,7 @@
+ Plugin WordPress per gestire il debug direttamente dal pannello di amministrazione, senza più aprire l'FTP per modificare `wp-config.php` o scaricare `debug.log`. Include un **sistema di accesso emergency standalone** che funziona anche quando WordPress è crashato.
+ 
+ **Autore:** Davide Bertolino · [davidebertolino.it](https://www.davidebertolino.it)
+-**Versione:** 1.2.0
++**Versione:** 1.2.1
+ **Licenza:** GPL v2 or later
+ 
+ ---
+@@ -14,7 +14,7 @@ Plugin WordPress per gestire il debug direttamente dal pannello di amministrazio
+ - **Toggle delle costanti** (`WP_DEBUG`, `WP_DEBUG_LOG`, `WP_DEBUG_DISPLAY`, `SCRIPT_DEBUG`, `SAVEQUERIES`) con salvataggio diretto in `wp-config.php`.
+ - **Viewer del `debug.log`** in tempo reale, con filtro, auto-refresh ogni 5 secondi, download e svuotamento.
+ - **Query Monitor**: snapshot delle query SQL eseguite sull'ultima pagina frontend. Evidenzia le query lente (>50ms) e mostra il caller stack.
+-- **Backup automatico** di `wp-config.php` prima di ogni modifica (`.dbdm-bak`).
++- **Backup automatico** di `wp-config.php` prima di ogni modifica (in `private/`, cartella protetta deny-all).
+ - **Validazione sintattica PHP** pre-salvataggio (aborta se la modifica genererebbe parse error).
+ 
+ ### Emergency Access (v1.1.0)
+@@ -115,7 +115,7 @@ Gli snapshot mostrano il **diff** rispetto allo stato attuale (quale plugin è s
+ - Tutte le azioni admin protette da nonce + `manage_options`.
+ - `WP_DEBUG_DISPLAY` va tenuto **disattivato in produzione**.
+ - `SAVEQUERIES` impatta le performance: solo in debug attivo.
+-- I backup `.dbdm-bak` vengono sovrascritti a ogni modifica.
++- Il backup di `wp-config.php` (`private/wp-config.dbdm-bak`) viene sovrascritto a ogni modifica; ne esiste sempre solo l'ultimo.
+ - L'emergency access è **ad alto rischio**: chiunque ottenga la password ha accesso a operazioni distruttive. Trattala come chiave master.
+ 
+ ## Struttura file
+@@ -155,6 +155,10 @@ db-debug-manager/
+ 
+ ## Changelog
+ 
++### 1.2.1 — 2026-07-16
++- **Sicurezza (importante):** il backup di `wp-config.php` viene ora salvato in `private/wp-config.dbdm-bak` (cartella con deny-all) invece che accanto a `wp-config.php`, dove poteva essere scaricato come testo semplice esponendo le credenziali del database.
++- **Migrazione:** il vecchio backup `wp-config.php.dbdm-bak` nella webroot viene eliminato automaticamente alla prima apertura del pannello o alla prima modifica delle costanti. Se hai usato versioni ≤ 1.2.0, verifica comunque che il file non sia più presente.
++
+ ### 1.2.0 — 2026-04-16
+ - **Nuovo:** tab **Snapshots** — preflight capture dello stato del sito (plugin attivi + tema + versioni) con rollback selettivo.
+ - **Nuovo:** snapshot automatici su attivazione Emergency e dopo ogni aggiornamento completato da WordPress (`upgrader_process_complete`).
+diff --git a/db-debug-manager.php b/db-debug-manager.php
+index 9b90c80..567574f 100644
+--- a/db-debug-manager.php
++++ b/db-debug-manager.php
+@@ -3,7 +3,7 @@
+  * Plugin Name: DB Debug Manager
+  * Plugin URI: https://www.davidebertolino.it/progetti/
+  * Description: Gestione centralizzata del debug di WordPress: abilita/disabilita WP_DEBUG, WP_DEBUG_LOG, WP_DEBUG_DISPLAY, SCRIPT_DEBUG, SAVEQUERIES direttamente dal pannello, con viewer del debug.log e monitor delle query SQL.
+- * Version: 1.2.0
++ * Version: 1.2.1
+  * Author: Davide Bertolino
+  * Author URI: https://www.davidebertolino.it
+  * License: GPL v2 or later
+@@ -14,7 +14,7 @@
+ 
+ if (!defined('ABSPATH')) exit;
+ 
+-define('DBDM_VERSION', '1.2.0');
++define('DBDM_VERSION', '1.2.1');
+ define('DBDM_PLUGIN_FILE', __FILE__);
+ define('DBDM_PLUGIN_DIR', plugin_dir_path(__FILE__));
+ define('DBDM_PLUGIN_URL', plugin_dir_url(__FILE__));
+diff --git a/emergency.php b/emergency.php
+index df3b86d..30ecb39 100644
+--- a/emergency.php
++++ b/emergency.php
+@@ -407,7 +407,12 @@ function dbdm_em_toggle_constant($config_path, $name, $value) {
+     $content = file_get_contents($config_path);
+     if ($content === false) return 'lettura fallita';
+ 
+-    @copy($config_path, $config_path . '.dbdm-bak');
++    // Backup in private/ (deny-all), MAI accanto a wp-config.php nella webroot.
++    @copy($config_path, DBDM_EMERGENCY_PRIVATE_DIR . 'wp-config.dbdm-bak');
++    // Rimuove l'eventuale backup legacy esposto (versioni <= 1.2.0).
++    if (file_exists($config_path . '.dbdm-bak')) {
++        @unlink($config_path . '.dbdm-bak');
++    }
+ 
+     $php_value = $value ? 'true' : 'false';
+     $new_line  = "define('{$name}', {$php_value});";
+diff --git a/inc/class-admin.php b/inc/class-admin.php
+index 35d1960..45bd7ef 100644
+--- a/inc/class-admin.php
++++ b/inc/class-admin.php
+@@ -66,6 +66,9 @@ class DBDM_Admin {
+     public function render_page() {
+         if (!current_user_can('manage_options')) return;
+ 
++        // Migrazione: elimina il backup legacy esposto nella webroot (<= 1.2.0).
++        DBDM_Config::cleanup_legacy_backup();
++
+         $status        = DBDM_Config::get_status();
+         $writable      = DBDM_Config::is_writable();
+         $config_path   = DBDM_Config::get_config_path();
+diff --git a/inc/class-config.php b/inc/class-config.php
+index 828aaee..0dfbc34 100644
+--- a/inc/class-config.php
++++ b/inc/class-config.php
+@@ -81,9 +81,11 @@ class DBDM_Config {
+             return new WP_Error('dbdm_read_fail', __('Impossibile leggere wp-config.php.', 'db-debug-manager'));
+         }
+ 
+-        // Backup prima di ogni modifica.
+-        $backup = $path . '.dbdm-bak';
+-        @copy($path, $backup);
++        // Backup prima di ogni modifica, nella cartella private/ del plugin
++        // (deny-all via .htaccess): mai accanto a wp-config.php, dove sarebbe
++        // servito come testo semplice esponendo le credenziali DB.
++        @copy($path, self::backup_path());
++        self::cleanup_legacy_backup();
+ 
+         $new_contents = self::replace_or_insert_constant($contents, $name, $value);
+ 
+@@ -112,6 +114,25 @@ class DBDM_Config {
+         return true;
+     }
+ 
++    /**
++     * Path del backup di wp-config.php dentro private/.
++     */
++    public static function backup_path() {
++        return DBDM_Emergency::private_dir() . 'wp-config.dbdm-bak';
++    }
++
++    /**
++     * Elimina il backup legacy creato accanto a wp-config.php dalle
++     * versioni <= 1.2.0: si trova nella webroot ed è potenzialmente
++     * scaricabile come testo semplice (leak credenziali DB).
++     */
++    public static function cleanup_legacy_backup() {
++        $path = self::get_config_path();
++        if ($path && file_exists($path . '.dbdm-bak')) {
++            @unlink($path . '.dbdm-bak');
++        }
++    }
++
+     /**
+      * Verifica sintassi PHP di un file.
+      */
+diff --git a/inc/class-emergency.php b/inc/class-emergency.php
+index 9e07bb8..7e1c346 100644
+--- a/inc/class-emergency.php
++++ b/inc/class-emergency.php
+@@ -69,6 +69,15 @@ class DBDM_Emergency {
+         return DBDM_PLUGIN_DIR . 'private/emergency-sessions.json';
+     }
+ 
++    /**
++     * Path della cartella private/ (con trailing slash), garantendone
++     * esistenza e protezione. Riusabile dalle altre classi del plugin.
++     */
++    public static function private_dir() {
++        self::ensure_private_dir();
++        return DBDM_PLUGIN_DIR . 'private/';
++    }
++
+     /**
+      * Crea la cartella private/ con protezioni (htaccess + index).
+      */
+diff --git a/templates/tab-config.php b/templates/tab-config.php
+index a729545..dc25c25 100644
+--- a/templates/tab-config.php
++++ b/templates/tab-config.php
+@@ -96,7 +96,7 @@ $descriptions = array(
+                 <button type="submit" class="db-ui-btn db-ui-btn-primary" <?php disabled(!$writable); ?>>
+                     <?php esc_html_e('Salva modifiche', 'db-debug-manager'); ?>
+                 </button>
+-                <span class="db-ui-text-muted"><?php esc_html_e('Le modifiche hanno effetto al prossimo caricamento pagina (un backup automatico di wp-config.php viene creato come .dbdm-bak).', 'db-debug-manager'); ?></span>
++                <span class="db-ui-text-muted"><?php esc_html_e('Le modifiche hanno effetto al prossimo caricamento pagina (backup automatico di wp-config.php in private/wp-config.dbdm-bak).', 'db-debug-manager'); ?></span>
+             </div>
+         </form>
+     </div>

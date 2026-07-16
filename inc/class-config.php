@@ -81,9 +81,11 @@ class DBDM_Config {
             return new WP_Error('dbdm_read_fail', __('Impossibile leggere wp-config.php.', 'db-debug-manager'));
         }
 
-        // Backup prima di ogni modifica.
-        $backup = $path . '.dbdm-bak';
-        @copy($path, $backup);
+        // Backup prima di ogni modifica, nella cartella private/ del plugin
+        // (deny-all via .htaccess): mai accanto a wp-config.php, dove sarebbe
+        // servito come testo semplice esponendo le credenziali DB.
+        @copy($path, self::backup_path());
+        self::cleanup_legacy_backup();
 
         $new_contents = self::replace_or_insert_constant($contents, $name, $value);
 
@@ -110,6 +112,25 @@ class DBDM_Config {
         }
 
         return true;
+    }
+
+    /**
+     * Path del backup di wp-config.php dentro private/.
+     */
+    public static function backup_path() {
+        return DBDM_Emergency::private_dir() . 'wp-config.dbdm-bak';
+    }
+
+    /**
+     * Elimina il backup legacy creato accanto a wp-config.php dalle
+     * versioni <= 1.2.0: si trova nella webroot ed è potenzialmente
+     * scaricabile come testo semplice (leak credenziali DB).
+     */
+    public static function cleanup_legacy_backup() {
+        $path = self::get_config_path();
+        if ($path && file_exists($path . '.dbdm-bak')) {
+            @unlink($path . '.dbdm-bak');
+        }
     }
 
     /**

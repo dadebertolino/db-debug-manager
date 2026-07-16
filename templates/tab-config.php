@@ -96,7 +96,7 @@ $descriptions = array(
                 <button type="submit" class="db-ui-btn db-ui-btn-primary" <?php disabled(!$writable); ?>>
                     <?php esc_html_e('Salva modifiche', 'db-debug-manager'); ?>
                 </button>
-                <span class="db-ui-text-muted"><?php esc_html_e('Le modifiche hanno effetto al prossimo caricamento pagina (un backup automatico di wp-config.php viene creato come .dbdm-bak).', 'db-debug-manager'); ?></span>
+                <span class="db-ui-text-muted"><?php esc_html_e('Le modifiche hanno effetto al prossimo caricamento pagina (backup automatico di wp-config.php in private/wp-config.dbdm-bak).', 'db-debug-manager'); ?></span>
             </div>
         </form>
     </div>

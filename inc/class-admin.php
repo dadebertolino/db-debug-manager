@@ -66,6 +66,9 @@ class DBDM_Admin {
     public function render_page() {
         if (!current_user_can('manage_options')) return;
 
+        // Migrazione: elimina il backup legacy esposto nella webroot (<= 1.2.0).
+        DBDM_Config::cleanup_legacy_backup();
+
         $status        = DBDM_Config::get_status();
         $writable      = DBDM_Config::is_writable();
         $config_path   = DBDM_Config::get_config_path();

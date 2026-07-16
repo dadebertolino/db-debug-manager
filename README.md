@@ -3,7 +3,7 @@
 Plugin WordPress per gestire il debug direttamente dal pannello di amministrazione, senza più aprire l'FTP per modificare `wp-config.php` o scaricare `debug.log`. Include un **sistema di accesso emergency standalone** che funziona anche quando WordPress è crashato.
 
 **Autore:** Davide Bertolino · [davidebertolino.it](https://www.davidebertolino.it)
-**Versione:** 1.2.0
+**Versione:** 1.2.1
 **Licenza:** GPL v2 or later
 
 ---
@@ -14,7 +14,7 @@ Plugin WordPress per gestire il debug direttamente dal pannello di amministrazio
 - **Toggle delle costanti** (`WP_DEBUG`, `WP_DEBUG_LOG`, `WP_DEBUG_DISPLAY`, `SCRIPT_DEBUG`, `SAVEQUERIES`) con salvataggio diretto in `wp-config.php`.
 - **Viewer del `debug.log`** in tempo reale, con filtro, auto-refresh ogni 5 secondi, download e svuotamento.
 - **Query Monitor**: snapshot delle query SQL eseguite sull'ultima pagina frontend. Evidenzia le query lente (>50ms) e mostra il caller stack.
-- **Backup automatico** di `wp-config.php` prima di ogni modifica (`.dbdm-bak`).
+- **Backup automatico** di `wp-config.php` prima di ogni modifica (in `private/`, cartella protetta deny-all).
 - **Validazione sintattica PHP** pre-salvataggio (aborta se la modifica genererebbe parse error).
 
 ### Emergency Access (v1.1.0)
@@ -115,7 +115,7 @@ Gli snapshot mostrano il **diff** rispetto allo stato attuale (quale plugin è s
 - Tutte le azioni admin protette da nonce + `manage_options`.
 - `WP_DEBUG_DISPLAY` va tenuto **disattivato in produzione**.
 - `SAVEQUERIES` impatta le performance: solo in debug attivo.
-- I backup `.dbdm-bak` vengono sovrascritti a ogni modifica.
+- Il backup di `wp-config.php` (`private/wp-config.dbdm-bak`) viene sovrascritto a ogni modifica; ne esiste sempre solo l'ultimo.
 - L'emergency access è **ad alto rischio**: chiunque ottenga la password ha accesso a operazioni distruttive. Trattala come chiave master.
 
 ## Struttura file
@@ -154,6 +154,10 @@ db-debug-manager/
 ```
 
 ## Changelog
+
+### 1.2.1 — 2026-07-16
+- **Sicurezza (importante):** il backup di `wp-config.php` viene ora salvato in `private/wp-config.dbdm-bak` (cartella con deny-all) invece che accanto a `wp-config.php`, dove poteva essere scaricato come testo semplice esponendo le credenziali del database.
+- **Migrazione:** il vecchio backup `wp-config.php.dbdm-bak` nella webroot viene eliminato automaticamente alla prima apertura del pannello o alla prima modifica delle costanti. Se hai usato versioni ≤ 1.2.0, verifica comunque che il file non sia più presente.
 
 ### 1.2.0 — 2026-04-16
 - **Nuovo:** tab **Snapshots** — preflight capture dello stato del sito (plugin attivi + tema + versioni) con rollback selettivo.
