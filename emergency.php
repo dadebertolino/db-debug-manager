@@ -41,23 +41,34 @@ define('DBDM_EMERGENCY_MAX_ATTEMPTS', 5);
 define('DBDM_EMERGENCY_LOCKOUT_SEC', 900);   // 15 min
 define('DBDM_EMERGENCY_SESSION_TTL', 1800);  // 30 min
 define('DBDM_EMERGENCY_PLUGIN_DIR', __DIR__ . '/');
-define('DBDM_EMERGENCY_PRIVATE_DIR', __DIR__ . '/private/');
-
-// Assicura esistenza private/ con protezione htaccess.
-if (!is_dir(DBDM_EMERGENCY_PRIVATE_DIR)) {
-    @mkdir(DBDM_EMERGENCY_PRIVATE_DIR, 0755);
-}
-if (!file_exists(DBDM_EMERGENCY_PRIVATE_DIR . '.htaccess')) {
-    @file_put_contents(DBDM_EMERGENCY_PRIVATE_DIR . '.htaccess', "Require all denied\nDeny from all\n");
-}
-if (!file_exists(DBDM_EMERGENCY_PRIVATE_DIR . 'index.php')) {
-    @file_put_contents(DBDM_EMERGENCY_PRIVATE_DIR . 'index.php', "<?php // Silence is golden.\n");
-}
-
-define('DBDM_EMERGENCY_LOG',    DBDM_EMERGENCY_PRIVATE_DIR . 'emergency-access.log');
-define('DBDM_EMERGENCY_RL',     DBDM_EMERGENCY_PRIVATE_DIR . 'emergency-ratelimit.json');
 
 require_once __DIR__ . '/inc/class-standalone-config.php';
+
+// ========= CARTELLA PRIVATA =========
+// Il nome reale (private-{token}) viene risolto dopo la connessione al DB,
+// leggendo il token da wp_options (vedi VERIFICA ATTIVAZIONE). Fallback alla
+// legacy private/ per installazioni non ancora migrate dal lato WP.
+$GLOBALS['dbdm_em_private_dir'] = __DIR__ . '/private/';
+
+function dbdm_em_private_dir() {
+    return $GLOBALS['dbdm_em_private_dir'];
+}
+
+function dbdm_em_private_path($file) {
+    return dbdm_em_private_dir() . $file;
+}
+
+function dbdm_em_ensure_private_dir($dir) {
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755);
+    }
+    if (!file_exists($dir . '.htaccess')) {
+        @file_put_contents($dir . '.htaccess', "Require all denied\nDeny from all\n");
+    }
+    if (!file_exists($dir . 'index.php')) {
+        @file_put_contents($dir . 'index.php', "<?php // Silence is golden.\n");
+    }
+}
 
 // ========= HELPER =========
 // Flag impostato dopo la lettura delle opzioni dal DB (vedi VERIFICA ATTIVAZIONE).
@@ -104,19 +115,19 @@ function dbdm_em_log($event, $detail = '') {
         substr(isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '-', 0, 120),
         $detail
     );
-    @file_put_contents(DBDM_EMERGENCY_LOG, $line, FILE_APPEND | LOCK_EX);
+    @file_put_contents(dbdm_em_private_path('emergency-access.log'), $line, FILE_APPEND | LOCK_EX);
 }
 
 function dbdm_em_read_rl() {
-    if (!file_exists(DBDM_EMERGENCY_RL)) return array();
-    $raw = @file_get_contents(DBDM_EMERGENCY_RL);
+    if (!file_exists(dbdm_em_private_path('emergency-ratelimit.json'))) return array();
+    $raw = @file_get_contents(dbdm_em_private_path('emergency-ratelimit.json'));
     if (!$raw) return array();
     $data = json_decode($raw, true);
     return is_array($data) ? $data : array();
 }
 
 function dbdm_em_write_rl($data) {
-    @file_put_contents(DBDM_EMERGENCY_RL, json_encode($data), LOCK_EX);
+    @file_put_contents(dbdm_em_private_path('emergency-ratelimit.json'), json_encode($data), LOCK_EX);
 }
 
 function dbdm_em_is_locked($ip) {
@@ -223,6 +234,13 @@ if (empty($stored_hash)) {
 
 // Modalità proxy fidato: da qui in poi dbdm_em_ip() può usare gli header proxy.
 $GLOBALS['dbdm_em_trust_proxy'] = (bool) dbdm_em_get_option($pdo, $prefix, 'dbdm_emergency_trust_proxy', false);
+
+// Cartella privata randomizzata: risolta dal token in wp_options.
+$dir_token = dbdm_em_get_option($pdo, $prefix, 'dbdm_private_dir_token', '');
+if (is_string($dir_token) && preg_match('/^[a-f0-9]{16}$/', $dir_token)) {
+    $GLOBALS['dbdm_em_private_dir'] = __DIR__ . '/private-' . $dir_token . '/';
+}
+dbdm_em_ensure_private_dir(dbdm_em_private_dir());
 
 // ========= ROUTING =========
 $ip = dbdm_em_ip();
@@ -364,7 +382,7 @@ if ($is_post && dbdm_em_csrf_check()) {
                 $snap_id = isset($_POST['snap_id']) ? $_POST['snap_id'] : '';
                 $restore_plugins = !empty($_POST['restore_plugins']);
                 $restore_theme   = !empty($_POST['restore_theme']);
-                $snaps_file = __DIR__ . '/private/snapshots.json';
+                $snaps_file = dbdm_em_private_path('snapshots.json');
 
                 if (!$snap_id || (!$restore_plugins && !$restore_theme)) {
                     $notices[] = array('err', 'Parametri ripristino incompleti.');
@@ -427,38 +445,21 @@ if ($is_post && dbdm_em_csrf_check()) {
     }
 }
 
-// Funzione toggle costante (copia semplificata di DBDM_Config::set_constant).
+// Toggle costante: delega alla logica condivisa in DBDM_Standalone_Config,
+// che include la validazione sintattica PHP pre-scrittura (in emergency un
+// wp-config rotto sarebbe il caso peggiore possibile).
 function dbdm_em_toggle_constant($config_path, $name, $value) {
-    if (!is_writable($config_path)) return 'wp-config.php non scrivibile.';
-    $content = file_get_contents($config_path);
-    if ($content === false) return 'lettura fallita';
-
-    // Backup in private/ (deny-all), MAI accanto a wp-config.php nella webroot.
-    @copy($config_path, DBDM_EMERGENCY_PRIVATE_DIR . 'wp-config.dbdm-bak');
+    $result = DBDM_Standalone_Config::set_bool_constant(
+        $config_path,
+        $name,
+        (bool) $value,
+        dbdm_em_private_path('wp-config.dbdm-bak')
+    );
     // Rimuove l'eventuale backup legacy esposto (versioni <= 1.2.0).
     if (file_exists($config_path . '.dbdm-bak')) {
         @unlink($config_path . '.dbdm-bak');
     }
-
-    $php_value = $value ? 'true' : 'false';
-    $new_line  = "define('{$name}', {$php_value});";
-
-    $pattern = '/^[ \t]*(?:\/\/|#|\/\*)?[ \t]*define\s*\(\s*[\'"]' . preg_quote($name, '/') . '[\'"]\s*,.*?\)\s*;[ \t]*(?:\*\/)?[ \t]*(\r?\n|$)/mi';
-
-    if (preg_match($pattern, $content)) {
-        $new = preg_replace($pattern, $new_line . "\n", $content, 1);
-    } else {
-        $marker = "/* That's all, stop editing!";
-        $pos = strpos($content, $marker);
-        if ($pos !== false) {
-            $new = substr($content, 0, $pos) . $new_line . "\n\n" . substr($content, $pos);
-        } else {
-            $new = rtrim($content) . "\n\n" . $new_line . "\n";
-        }
-    }
-
-    if (file_put_contents($config_path, $new) === false) return 'scrittura fallita';
-    return true;
+    return $result;
 }
 
 // ========= RACCOLTA DATI PER VISTA =========
@@ -491,8 +492,17 @@ $cur_theme = dbdm_em_get_option($pdo, $prefix, 'stylesheet', '-');
 $wp_config_content = @file_get_contents($config_path);
 $consts_status = array();
 foreach (array('WP_DEBUG', 'WP_DEBUG_LOG', 'WP_DEBUG_DISPLAY', 'SCRIPT_DEBUG', 'SAVEQUERIES') as $c) {
-    if (preg_match('/^[ \t]*define\s*\(\s*[\'"]' . preg_quote($c, '/') . '[\'"]\s*,\s*(true|false)\s*\)\s*;/mi', $wp_config_content, $m)) {
-        $consts_status[$c] = strtolower($m[1]) === 'true';
+    // Cattura bool ma anche stringhe (WP_DEBUG_LOG può essere un path custom).
+    if (preg_match('/^[ \t]*define\s*\(\s*[\'"]' . preg_quote($c, '/') . '[\'"]\s*,\s*(true|false|\'[^\']*\'|"[^"]*")\s*\)\s*;/mi', $wp_config_content, $m)) {
+        $raw = strtolower(trim($m[1]));
+        if ($raw === 'true') {
+            $consts_status[$c] = true;
+        } elseif ($raw === 'false') {
+            $consts_status[$c] = false;
+        } else {
+            // Stringa: non vuota = attiva (path custom). Vuota = false.
+            $consts_status[$c] = trim($m[1], '\'"') !== '';
+        }
     } else {
         $consts_status[$c] = null;
     }
@@ -500,7 +510,7 @@ foreach (array('WP_DEBUG', 'WP_DEBUG_LOG', 'WP_DEBUG_DISPLAY', 'SCRIPT_DEBUG', '
 
 // Snapshots disponibili.
 $snapshots = array();
-$snaps_file = __DIR__ . '/private/snapshots.json';
+$snaps_file = dbdm_em_private_path('snapshots.json');
 if (file_exists($snaps_file)) {
     $raw = @file_get_contents($snaps_file);
     if ($raw) {
@@ -659,25 +669,25 @@ function dbdm_em_render_dashboard($notices, $log_content, $log_size, $active_plu
         <p style="color:var(--muted); font-size:12px; margin:0 0 12px;">Usa queste azioni se il sito è down. Ogni operazione è irreversibile senza un backup.</p>
         <div class="row">
             <form method="post" style="display:inline;" onsubmit="return confirm('Disattivare TUTTI i plugin?');">
-                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
                 <input type="hidden" name="a" value="disable_all_plugins">
                 <button type="submit" class="btn btn-danger btn-sm">🔌 Disattiva tutti i plugin</button>
             </form>
 
             <form method="post" style="display:inline;" onsubmit="return confirm('Cambiare al tema default? Lo stylesheet e template attuali verranno sostituiti.');">
-                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
                 <input type="hidden" name="a" value="switch_to_default_theme">
                 <button type="submit" class="btn btn-warn btn-sm">🎨 Cambia a tema default</button>
             </form>
 
             <form method="post" style="display:inline;">
-                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
                 <input type="hidden" name="a" value="clear_transients">
                 <button type="submit" class="btn btn-sm">🧹 Svuota transient</button>
             </form>
 
             <form method="post" style="display:inline;">
-                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
                 <input type="hidden" name="a" value="clear_log">
                 <button type="submit" class="btn btn-sm">🗑 Svuota debug.log</button>
             </form>
@@ -698,7 +708,7 @@ function dbdm_em_render_dashboard($notices, $log_content, $log_size, $active_plu
                         </td>
                         <td style="text-align:right;">
                             <form method="post" style="display:inline;">
-                                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
                                 <input type="hidden" name="a" value="toggle_const">
                                 <input type="hidden" name="const" value="<?php echo $name; ?>">
                                 <input type="hidden" name="enable" value="<?php echo $val === true ? '0' : '1'; ?>">
@@ -757,7 +767,7 @@ function dbdm_em_render_dashboard($notices, $log_content, $log_size, $active_plu
                 </div>
 
                 <form method="post" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;" onsubmit="return confirm('Ripristinare questo snapshot? Verranno modificati i plugin attivi/tema nel database.');">
-                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                    <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
                     <input type="hidden" name="a" value="restore_snapshot">
                     <input type="hidden" name="snap_id" value="<?php echo htmlspecialchars($snap['id'] ?? '', ENT_QUOTES); ?>">
                     <label style="font-size:12px; color:var(--text);">
@@ -786,7 +796,7 @@ function dbdm_em_render_dashboard($notices, $log_content, $log_size, $active_plu
                             <td><code><?php echo htmlspecialchars($p, ENT_QUOTES); ?></code></td>
                             <td style="text-align:right;">
                                 <form method="post" style="display:inline;" onsubmit="return confirm('Disattivare <?php echo htmlspecialchars($p, ENT_QUOTES); ?>?');">
-                                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                    <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
                                     <input type="hidden" name="a" value="disable_plugin">
                                     <input type="hidden" name="plugin" value="<?php echo htmlspecialchars($p, ENT_QUOTES); ?>">
                                     <button type="submit" class="btn btn-danger btn-sm">Disattiva</button>

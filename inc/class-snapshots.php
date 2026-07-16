@@ -5,7 +5,7 @@
  * Cattura lo stato del sito (plugin attivi + tema + versioni) e consente rollback.
  * Trigger: manuale, attivazione emergency, completamento upgrade WP.
  *
- * Storage: private/snapshots.json, FIFO, max MAX_SNAPSHOTS.
+ * Storage: snapshots.json nella cartella privata randomizzata, FIFO, max MAX_SNAPSHOTS.
  */
 
 if (!defined('ABSPATH')) exit;
@@ -67,9 +67,8 @@ class DBDM_Snapshots {
      * Path del file snapshot JSON.
      */
     public static function storage_path() {
-        // Riusa la cartella private/ creata da DBDM_Emergency.
-        DBDM_Emergency::log_path(); // trigger ensure_private_dir
-        return DBDM_PLUGIN_DIR . 'private/snapshots.json';
+        // Riusa la cartella privata (randomizzata) gestita da DBDM_Emergency.
+        return DBDM_Emergency::private_dir() . 'snapshots.json';
     }
 
     /**

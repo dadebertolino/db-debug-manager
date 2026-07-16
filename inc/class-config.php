@@ -87,24 +87,19 @@ class DBDM_Config {
         @copy($path, self::backup_path());
         self::cleanup_legacy_backup();
 
-        $new_contents = self::replace_or_insert_constant($contents, $name, $value);
+        $new_contents = DBDM_Standalone_Config::replace_or_insert_constant(
+            $contents, $name, self::format_value($value)
+        );
 
         if ($new_contents === $contents) {
             // Nessuna modifica necessaria.
             return true;
         }
 
-        // Validazione sintattica prima di salvare.
-        $tmp = wp_tempnam('dbdm-config');
-        if (!$tmp || file_put_contents($tmp, $new_contents) === false) {
-            return new WP_Error('dbdm_tmp_fail', __('Impossibile creare file temporaneo.', 'db-debug-manager'));
-        }
-
-        $check = self::php_lint($tmp);
-        @unlink($tmp);
-
-        if (is_wp_error($check)) {
-            return $check;
+        // Validazione sintattica prima di salvare (logica condivisa).
+        $check = DBDM_Standalone_Config::php_lint_string($new_contents);
+        if ($check !== true) {
+            return new WP_Error('dbdm_syntax_error', __('Errore di sintassi rilevato. Modifica annullata.', 'db-debug-manager'));
         }
 
         if (file_put_contents($path, $new_contents) === false) {
@@ -131,57 +126,6 @@ class DBDM_Config {
         if ($path && file_exists($path . '.dbdm-bak')) {
             @unlink($path . '.dbdm-bak');
         }
-    }
-
-    /**
-     * Verifica sintassi PHP di un file.
-     */
-    private static function php_lint($file) {
-        if (!function_exists('exec')) {
-            return true; // skip se exec disabilitata
-        }
-        $php = defined('PHP_BINARY') ? PHP_BINARY : 'php';
-        $cmd = escapeshellarg($php) . ' -l ' . escapeshellarg($file) . ' 2>&1';
-        @exec($cmd, $output, $code);
-        if ($code !== 0) {
-            return new WP_Error('dbdm_syntax_error', __('Errore di sintassi rilevato. Modifica annullata.', 'db-debug-manager'));
-        }
-        return true;
-    }
-
-    /**
-     * Sostituisce o inserisce una define() in wp-config.
-     * Regole:
-     * - Se la costante esiste (anche commentata con // o #), viene sostituita la riga.
-     * - Altrimenti viene inserita prima di "/* That's all, stop editing!".
-     */
-    private static function replace_or_insert_constant($contents, $name, $value) {
-        $php_value = self::format_value($value);
-        $new_line  = "define('{$name}', {$php_value});";
-
-        // Regex: cattura righe define della costante, anche commentate.
-        // Matches: // define(...); | # define(...); | /* define(...); */ | define(...);
-        $pattern = '/^[ \t]*(?:\/\/|#|\/\*)?[ \t]*define\s*\(\s*[\'"]' . preg_quote($name, '/') . '[\'"]\s*,.*?\)\s*;[ \t]*(?:\*\/)?[ \t]*(\r?\n|$)/mi';
-
-        if (preg_match($pattern, $contents)) {
-            return preg_replace($pattern, $new_line . "\n", $contents, 1);
-        }
-
-        // Inserimento prima del marker di fine editing.
-        $marker = "/* That's all, stop editing!";
-        $pos = strpos($contents, $marker);
-        if ($pos !== false) {
-            return substr($contents, 0, $pos) . $new_line . "\n\n" . substr($contents, $pos);
-        }
-
-        // Fallback: inserisci prima del primo require_once ABSPATH.
-        $fallback = '/^(require_once\s*[\(\s].*?wp-settings\.php.*?;)/mi';
-        if (preg_match($fallback, $contents)) {
-            return preg_replace($fallback, $new_line . "\n\n$1", $contents, 1);
-        }
-
-        // Ultimo fallback: in coda.
-        return rtrim($contents) . "\n\n" . $new_line . "\n";
     }
 
     /**

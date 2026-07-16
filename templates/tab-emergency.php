@@ -10,6 +10,21 @@ $access_url    = DBDM_Emergency::access_url();
 $log_entries   = DBDM_Emergency::get_log_entries(50);
 ?>
 
+<?php
+$dbdm_server = isset($_SERVER['SERVER_SOFTWARE']) ? $_SERVER['SERVER_SOFTWARE'] : '';
+$dbdm_is_apache = (stripos($dbdm_server, 'apache') !== false || stripos($dbdm_server, 'litespeed') !== false);
+if (!$dbdm_is_apache):
+?>
+<div class="db-ui-alert db-ui-alert-warning">
+    <span class="db-ui-alert-icon">🛡️</span>
+    <span>
+        <strong><?php esc_html_e('Server non Apache rilevato.', 'db-debug-manager'); ?></strong>
+        <?php esc_html_e('I file interni del plugin (log, snapshot, backup di wp-config) sono in una cartella con nome casuale e protetta da .htaccess, ma su Nginx l\'.htaccess viene ignorato. Per una protezione esplicita aggiungi alla configurazione del server:', 'db-debug-manager'); ?>
+        <br><code style="display:block; margin-top:6px; user-select:all;">location ~ /wp-content/plugins/db-debug-manager/(private|.*\.(log|json|dbdm-bak)$) { deny all; }</code>
+    </span>
+</div>
+<?php endif; ?>
+
 <div class="db-ui-alert db-ui-alert-warning">
     <span class="db-ui-alert-icon">⚠️</span>
     <span>

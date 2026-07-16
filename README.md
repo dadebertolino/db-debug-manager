@@ -3,7 +3,7 @@
 Plugin WordPress per gestire il debug direttamente dal pannello di amministrazione, senza più aprire l'FTP per modificare `wp-config.php` o scaricare `debug.log`. Include un **sistema di accesso emergency standalone** che funziona anche quando WordPress è crashato.
 
 **Autore:** Davide Bertolino · [davidebertolino.it](https://www.davidebertolino.it)
-**Versione:** 1.2.1
+**Versione:** 1.3.0
 **Licenza:** GPL v2 or later
 
 ---
@@ -14,7 +14,7 @@ Plugin WordPress per gestire il debug direttamente dal pannello di amministrazio
 - **Toggle delle costanti** (`WP_DEBUG`, `WP_DEBUG_LOG`, `WP_DEBUG_DISPLAY`, `SCRIPT_DEBUG`, `SAVEQUERIES`) con salvataggio diretto in `wp-config.php`.
 - **Viewer del `debug.log`** in tempo reale, con filtro, auto-refresh ogni 5 secondi, download e svuotamento.
 - **Query Monitor**: snapshot delle query SQL eseguite sull'ultima pagina frontend. Evidenzia le query lente (>50ms) e mostra il caller stack.
-- **Backup automatico** di `wp-config.php` prima di ogni modifica (in `private/`, cartella protetta deny-all).
+- **Backup automatico** di `wp-config.php` prima di ogni modifica (nella cartella privata randomizzata, deny-all).
 - **Validazione sintattica PHP** pre-salvataggio (aborta se la modifica genererebbe parse error).
 
 ### Emergency Access (v1.1.0)
@@ -105,7 +105,7 @@ Gli snapshot mostrano il **diff** rispetto allo stato attuale (quale plugin è s
 - Ogni tentativo (login, successo, blocco, azione) viene loggato con IP e User-Agent.
 - Sessione 30 minuti, cookie HttpOnly + SameSite=Strict.
 - CSRF token su ogni azione distruttiva.
-- File interni (log, rate-limit) in `private/` con `.htaccess` deny-all.
+- File interni (log, rate-limit, snapshot, backup) in una cartella a nome casuale `private-{token}` con `.htaccess` deny-all: protetti anche su Nginx.
 - `<meta name="robots" content="noindex, nofollow">`.
 
 **Quando il sito funziona bene, disattiva l'emergency.** È una feature da tenere spenta di default e accendere solo nei momenti di crisi.
@@ -115,7 +115,7 @@ Gli snapshot mostrano il **diff** rispetto allo stato attuale (quale plugin è s
 - Tutte le azioni admin protette da nonce + `manage_options`.
 - `WP_DEBUG_DISPLAY` va tenuto **disattivato in produzione**.
 - `SAVEQUERIES` impatta le performance: solo in debug attivo.
-- Il backup di `wp-config.php` (`private/wp-config.dbdm-bak`) viene sovrascritto a ogni modifica; ne esiste sempre solo l'ultimo.
+- Il backup di `wp-config.php` (`private-{token}/wp-config.dbdm-bak`) viene sovrascritto a ogni modifica; ne esiste sempre solo l'ultimo.
 - L'emergency access è **ad alto rischio**: chiunque ottenga la password ha accesso a operazioni distruttive. Trattala come chiave master.
 
 ## Struttura file
@@ -141,7 +141,8 @@ db-debug-manager/
 │   ├── class-snapshots.php      # Preflight capture & rollback
 │   ├── class-standalone-config.php  # Parser wp-config (no WP deps)
 │   └── class-updater.php        # GitHub auto-updater
-├── private/                     # Auto-creata, log + snapshots
+├── index.php                    # Anti directory-listing
+├── private-{token}/             # Auto-creata (nome casuale), log + snapshot + backup
 │   ├── .htaccess                # Deny all
 │   └── index.php
 └── templates/
@@ -155,7 +156,13 @@ db-debug-manager/
 
 ## Changelog
 
-### 1.2.1 — 2026-07-16
+### 1.3.0 — 2026-07-16
+- **Pulizia:** rimosso il codice morto della gestione sessioni su file (`session_path()`, `emergency-sessions.json`): l'emergency usa le sessioni PHP native da sempre.
+- **Hardening:** token CSRF escapato con `htmlspecialchars` in tutti i campi hidden di emergency.php (coerenza con il resto dell'output).
+- **Fix:** un `WP_DEBUG_LOG` impostato a un path custom (stringa) non viene più sovrascritto o azzerato dal salvataggio delle costanti: viene mostrato come attivo con il path visibile, il toggle off lo memorizza in wp_options e il toggle on lo ripristina. Anche la dashboard emergency ora riconosce i path stringa.
+- **Sicurezza:** la validazione sintattica PHP pre-salvataggio di `wp-config.php` ora è attiva anche nel toggle costanti dall'Emergency standalone (prima solo dal pannello WP). Logica di sostituzione/inserimento e lint consolidate in `DBDM_Standalone_Config`: un'unica implementazione condivisa dai due contesti.
+- **Sicurezza:** la cartella dei file interni (log accessi, snapshot, backup wp-config) ora ha un nome casuale (`private-{token}`) non indovinabile: i file restano protetti anche su Nginx, dove l'`.htaccess` viene ignorato. Migrazione automatica dalla vecchia `private/`; il token è in wp_options ed è letto anche dall'emergency standalone. Aggiunto `index.php` nella root del plugin contro il directory listing.
+- **Sicurezza:** su server non-Apache il pannello mostra un avviso con lo snippet Nginx per il deny esplicito.
 - **Sicurezza (importante):** il backup di `wp-config.php` viene ora salvato in `private/wp-config.dbdm-bak` (cartella con deny-all) invece che accanto a `wp-config.php`, dove poteva essere scaricato come testo semplice esponendo le credenziali del database.
 - **Sicurezza (importante):** il rate-limit dell'emergency access ora usa `REMOTE_ADDR` invece degli header `X-Forwarded-For` / `CF-Connecting-IP`, che sono falsificabili dal client e permettevano di aggirare il blocco tentativi. Se il sito è dietro un proxy/CDN fidato, attiva la nuova opzione nella tab Emergency per usare gli header del proxy (viene letto l'ultimo hop di X-Forwarded-For, non il primo).
 - **Migrazione:** il vecchio backup `wp-config.php.dbdm-bak` nella webroot viene eliminato automaticamente alla prima apertura del pannello o alla prima modifica delle costanti. Se hai usato versioni ≤ 1.2.0, verifica comunque che il file non sia più presente.

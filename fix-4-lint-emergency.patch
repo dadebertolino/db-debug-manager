@@ -1,0 +1,258 @@
+diff --git a/README.md b/README.md
+index 0cbbc5c..91c836a 100644
+--- a/README.md
++++ b/README.md
+@@ -157,6 +157,7 @@ db-debug-manager/
+ ## Changelog
+ 
+ ### 1.2.1 — 2026-07-16
++- **Sicurezza:** la validazione sintattica PHP pre-salvataggio di `wp-config.php` ora è attiva anche nel toggle costanti dall'Emergency standalone (prima solo dal pannello WP). Logica di sostituzione/inserimento e lint consolidate in `DBDM_Standalone_Config`: un'unica implementazione condivisa dai due contesti.
+ - **Sicurezza:** la cartella dei file interni (log accessi, snapshot, backup wp-config) ora ha un nome casuale (`private-{token}`) non indovinabile: i file restano protetti anche su Nginx, dove l'`.htaccess` viene ignorato. Migrazione automatica dalla vecchia `private/`; il token è in wp_options ed è letto anche dall'emergency standalone. Aggiunto `index.php` nella root del plugin contro il directory listing.
+ - **Sicurezza:** su server non-Apache il pannello mostra un avviso con lo snippet Nginx per il deny esplicito.
+ - **Sicurezza (importante):** il backup di `wp-config.php` viene ora salvato in `private/wp-config.dbdm-bak` (cartella con deny-all) invece che accanto a `wp-config.php`, dove poteva essere scaricato come testo semplice esponendo le credenziali del database.
+diff --git a/emergency.php b/emergency.php
+index 6ed5300..afd3beb 100644
+--- a/emergency.php
++++ b/emergency.php
+@@ -445,38 +445,21 @@ if ($is_post && dbdm_em_csrf_check()) {
+     }
+ }
+ 
+-// Funzione toggle costante (copia semplificata di DBDM_Config::set_constant).
++// Toggle costante: delega alla logica condivisa in DBDM_Standalone_Config,
++// che include la validazione sintattica PHP pre-scrittura (in emergency un
++// wp-config rotto sarebbe il caso peggiore possibile).
+ function dbdm_em_toggle_constant($config_path, $name, $value) {
+-    if (!is_writable($config_path)) return 'wp-config.php non scrivibile.';
+-    $content = file_get_contents($config_path);
+-    if ($content === false) return 'lettura fallita';
+-
+-    // Backup in private/ (deny-all), MAI accanto a wp-config.php nella webroot.
+-    @copy($config_path, dbdm_em_private_path('wp-config.dbdm-bak'));
++    $result = DBDM_Standalone_Config::set_bool_constant(
++        $config_path,
++        $name,
++        (bool) $value,
++        dbdm_em_private_path('wp-config.dbdm-bak')
++    );
+     // Rimuove l'eventuale backup legacy esposto (versioni <= 1.2.0).
+     if (file_exists($config_path . '.dbdm-bak')) {
+         @unlink($config_path . '.dbdm-bak');
+     }
+-
+-    $php_value = $value ? 'true' : 'false';
+-    $new_line  = "define('{$name}', {$php_value});";
+-
+-    $pattern = '/^[ \t]*(?:\/\/|#|\/\*)?[ \t]*define\s*\(\s*[\'"]' . preg_quote($name, '/') . '[\'"]\s*,.*?\)\s*;[ \t]*(?:\*\/)?[ \t]*(\r?\n|$)/mi';
+-
+-    if (preg_match($pattern, $content)) {
+-        $new = preg_replace($pattern, $new_line . "\n", $content, 1);
+-    } else {
+-        $marker = "/* That's all, stop editing!";
+-        $pos = strpos($content, $marker);
+-        if ($pos !== false) {
+-            $new = substr($content, 0, $pos) . $new_line . "\n\n" . substr($content, $pos);
+-        } else {
+-            $new = rtrim($content) . "\n\n" . $new_line . "\n";
+-        }
+-    }
+-
+-    if (file_put_contents($config_path, $new) === false) return 'scrittura fallita';
+-    return true;
++    return $result;
+ }
+ 
+ // ========= RACCOLTA DATI PER VISTA =========
+diff --git a/inc/class-config.php b/inc/class-config.php
+index 0dfbc34..1b627f1 100644
+--- a/inc/class-config.php
++++ b/inc/class-config.php
+@@ -87,24 +87,19 @@ class DBDM_Config {
+         @copy($path, self::backup_path());
+         self::cleanup_legacy_backup();
+ 
+-        $new_contents = self::replace_or_insert_constant($contents, $name, $value);
++        $new_contents = DBDM_Standalone_Config::replace_or_insert_constant(
++            $contents, $name, self::format_value($value)
++        );
+ 
+         if ($new_contents === $contents) {
+             // Nessuna modifica necessaria.
+             return true;
+         }
+ 
+-        // Validazione sintattica prima di salvare.
+-        $tmp = wp_tempnam('dbdm-config');
+-        if (!$tmp || file_put_contents($tmp, $new_contents) === false) {
+-            return new WP_Error('dbdm_tmp_fail', __('Impossibile creare file temporaneo.', 'db-debug-manager'));
+-        }
+-
+-        $check = self::php_lint($tmp);
+-        @unlink($tmp);
+-
+-        if (is_wp_error($check)) {
+-            return $check;
++        // Validazione sintattica prima di salvare (logica condivisa).
++        $check = DBDM_Standalone_Config::php_lint_string($new_contents);
++        if ($check !== true) {
++            return new WP_Error('dbdm_syntax_error', __('Errore di sintassi rilevato. Modifica annullata.', 'db-debug-manager'));
+         }
+ 
+         if (file_put_contents($path, $new_contents) === false) {
+@@ -133,57 +128,6 @@ class DBDM_Config {
+         }
+     }
+ 
+-    /**
+-     * Verifica sintassi PHP di un file.
+-     */
+-    private static function php_lint($file) {
+-        if (!function_exists('exec')) {
+-            return true; // skip se exec disabilitata
+-        }
+-        $php = defined('PHP_BINARY') ? PHP_BINARY : 'php';
+-        $cmd = escapeshellarg($php) . ' -l ' . escapeshellarg($file) . ' 2>&1';
+-        @exec($cmd, $output, $code);
+-        if ($code !== 0) {
+-            return new WP_Error('dbdm_syntax_error', __('Errore di sintassi rilevato. Modifica annullata.', 'db-debug-manager'));
+-        }
+-        return true;
+-    }
+-
+-    /**
+-     * Sostituisce o inserisce una define() in wp-config.
+-     * Regole:
+-     * - Se la costante esiste (anche commentata con // o #), viene sostituita la riga.
+-     * - Altrimenti viene inserita prima di "/* That's all, stop editing!".
+-     */
+-    private static function replace_or_insert_constant($contents, $name, $value) {
+-        $php_value = self::format_value($value);
+-        $new_line  = "define('{$name}', {$php_value});";
+-
+-        // Regex: cattura righe define della costante, anche commentate.
+-        // Matches: // define(...); | # define(...); | /* define(...); */ | define(...);
+-        $pattern = '/^[ \t]*(?:\/\/|#|\/\*)?[ \t]*define\s*\(\s*[\'"]' . preg_quote($name, '/') . '[\'"]\s*,.*?\)\s*;[ \t]*(?:\*\/)?[ \t]*(\r?\n|$)/mi';
+-
+-        if (preg_match($pattern, $contents)) {
+-            return preg_replace($pattern, $new_line . "\n", $contents, 1);
+-        }
+-
+-        // Inserimento prima del marker di fine editing.
+-        $marker = "/* That's all, stop editing!";
+-        $pos = strpos($contents, $marker);
+-        if ($pos !== false) {
+-            return substr($contents, 0, $pos) . $new_line . "\n\n" . substr($contents, $pos);
+-        }
+-
+-        // Fallback: inserisci prima del primo require_once ABSPATH.
+-        $fallback = '/^(require_once\s*[\(\s].*?wp-settings\.php.*?;)/mi';
+-        if (preg_match($fallback, $contents)) {
+-            return preg_replace($fallback, $new_line . "\n\n$1", $contents, 1);
+-        }
+-
+-        // Ultimo fallback: in coda.
+-        return rtrim($contents) . "\n\n" . $new_line . "\n";
+-    }
+-
+     /**
+      * Converte un valore PHP in rappresentazione sorgente.
+      */
+diff --git a/inc/class-standalone-config.php b/inc/class-standalone-config.php
+index 07e328d..669cd4b 100644
+--- a/inc/class-standalone-config.php
++++ b/inc/class-standalone-config.php
+@@ -85,6 +85,94 @@ class DBDM_Standalone_Config {
+         return false;
+     }
+ 
++    /**
++     * Sostituisce o inserisce una define() nel sorgente di wp-config.
++     * $php_value è già in forma sorgente ('true', 'false', "'stringa'").
++     * Regole:
++     * - Se la costante esiste (anche commentata con // o #), viene sostituita la riga.
++     * - Altrimenti viene inserita prima di "/* That's all, stop editing!".
++     * Logica CONDIVISA tra DBDM_Config (lato WP) ed emergency.php: modificala
++     * solo qui per evitare divergenze.
++     */
++    public static function replace_or_insert_constant($contents, $name, $php_value) {
++        $new_line = "define('{$name}', {$php_value});";
++
++        // Regex: cattura righe define della costante, anche commentate.
++        $pattern = '/^[ \t]*(?:\/\/|#|\/\*)?[ \t]*define\s*\(\s*[\'"]' . preg_quote($name, '/') . '[\'"]\s*,.*?\)\s*;[ \t]*(?:\*\/)?[ \t]*(\r?\n|$)/mi';
++
++        if (preg_match($pattern, $contents)) {
++            return preg_replace($pattern, $new_line . "\n", $contents, 1);
++        }
++
++        // Inserimento prima del marker di fine editing.
++        $marker = "/* That's all, stop editing!";
++        $pos = strpos($contents, $marker);
++        if ($pos !== false) {
++            return substr($contents, 0, $pos) . $new_line . "\n\n" . substr($contents, $pos);
++        }
++
++        // Fallback: inserisci prima del require di wp-settings.php.
++        $fallback = '/^(require_once\s*[\(\s].*?wp-settings\.php.*?;)/mi';
++        if (preg_match($fallback, $contents)) {
++            return preg_replace($fallback, $new_line . "\n\n$1", $contents, 1);
++        }
++
++        // Ultimo fallback: in coda.
++        return rtrim($contents) . "\n\n" . $new_line . "\n";
++    }
++
++    /**
++     * Verifica sintassi PHP di una stringa via `php -l` su file temporaneo.
++     * Ritorna true se ok (o se exec non disponibile: best effort), stringa
++     * di errore altrimenti. Nessuna dipendenza WP.
++     */
++    public static function php_lint_string($content) {
++        if (!function_exists('exec')) {
++            return true; // skip se exec disabilitata
++        }
++        $tmp = tempnam(sys_get_temp_dir(), 'dbdm-lint');
++        if (!$tmp || file_put_contents($tmp, $content) === false) {
++            return true; // impossibile testare: non bloccare
++        }
++        $php = defined('PHP_BINARY') && PHP_BINARY ? PHP_BINARY : 'php';
++        $cmd = escapeshellarg($php) . ' -l ' . escapeshellarg($tmp) . ' 2>&1';
++        @exec($cmd, $output, $code);
++        @unlink($tmp);
++        if ($code !== 0) {
++            return 'Errore di sintassi rilevato. Modifica annullata.';
++        }
++        return true;
++    }
++
++    /**
++     * Imposta una costante booleana in wp-config.php in modo sicuro:
++     * backup, sostituzione/inserimento, lint PRE-scrittura, poi scrittura.
++     * Ritorna true oppure una stringa di errore. Nessuna dipendenza WP.
++     *
++     * @param string $config_path Path di wp-config.php.
++     * @param string $name        Nome costante.
++     * @param bool   $value       Valore.
++     * @param string $backup_path Dove salvare il backup pre-modifica ('' per saltare).
++     */
++    public static function set_bool_constant($config_path, $name, $value, $backup_path = '') {
++        if (!is_writable($config_path)) return 'wp-config.php non scrivibile.';
++        $content = file_get_contents($config_path);
++        if ($content === false) return 'lettura fallita';
++
++        if ($backup_path) {
++            @copy($config_path, $backup_path);
++        }
++
++        $new = self::replace_or_insert_constant($content, $name, $value ? 'true' : 'false');
++        if ($new === $content) return true; // nessuna modifica necessaria
++
++        $lint = self::php_lint_string($new);
++        if ($lint !== true) return $lint;
++
++        if (file_put_contents($config_path, $new) === false) return 'scrittura fallita';
++        return true;
++    }
++
+     /**
+      * Connessione PDO.
+      */

@@ -1,0 +1,133 @@
+diff --git a/README.md b/README.md
+index 2145428..9ee52cf 100644
+--- a/README.md
++++ b/README.md
+@@ -3,7 +3,7 @@
+ Plugin WordPress per gestire il debug direttamente dal pannello di amministrazione, senza più aprire l'FTP per modificare `wp-config.php` o scaricare `debug.log`. Include un **sistema di accesso emergency standalone** che funziona anche quando WordPress è crashato.
+ 
+ **Autore:** Davide Bertolino · [davidebertolino.it](https://www.davidebertolino.it)
+-**Versione:** 1.2.1
++**Versione:** 1.3.0
+ **Licenza:** GPL v2 or later
+ 
+ ---
+@@ -156,7 +156,9 @@ db-debug-manager/
+ 
+ ## Changelog
+ 
+-### 1.2.1 — 2026-07-16
++### 1.3.0 — 2026-07-16
++- **Pulizia:** rimosso il codice morto della gestione sessioni su file (`session_path()`, `emergency-sessions.json`): l'emergency usa le sessioni PHP native da sempre.
++- **Hardening:** token CSRF escapato con `htmlspecialchars` in tutti i campi hidden di emergency.php (coerenza con il resto dell'output).
+ - **Fix:** un `WP_DEBUG_LOG` impostato a un path custom (stringa) non viene più sovrascritto o azzerato dal salvataggio delle costanti: viene mostrato come attivo con il path visibile, il toggle off lo memorizza in wp_options e il toggle on lo ripristina. Anche la dashboard emergency ora riconosce i path stringa.
+ - **Sicurezza:** la validazione sintattica PHP pre-salvataggio di `wp-config.php` ora è attiva anche nel toggle costanti dall'Emergency standalone (prima solo dal pannello WP). Logica di sostituzione/inserimento e lint consolidate in `DBDM_Standalone_Config`: un'unica implementazione condivisa dai due contesti.
+ - **Sicurezza:** la cartella dei file interni (log accessi, snapshot, backup wp-config) ora ha un nome casuale (`private-{token}`) non indovinabile: i file restano protetti anche su Nginx, dove l'`.htaccess` viene ignorato. Migrazione automatica dalla vecchia `private/`; il token è in wp_options ed è letto anche dall'emergency standalone. Aggiunto `index.php` nella root del plugin contro il directory listing.
+diff --git a/db-debug-manager.php b/db-debug-manager.php
+index 567574f..14aebfb 100644
+--- a/db-debug-manager.php
++++ b/db-debug-manager.php
+@@ -3,7 +3,7 @@
+  * Plugin Name: DB Debug Manager
+  * Plugin URI: https://www.davidebertolino.it/progetti/
+  * Description: Gestione centralizzata del debug di WordPress: abilita/disabilita WP_DEBUG, WP_DEBUG_LOG, WP_DEBUG_DISPLAY, SCRIPT_DEBUG, SAVEQUERIES direttamente dal pannello, con viewer del debug.log e monitor delle query SQL.
+- * Version: 1.2.1
++ * Version: 1.3.0
+  * Author: Davide Bertolino
+  * Author URI: https://www.davidebertolino.it
+  * License: GPL v2 or later
+@@ -14,7 +14,7 @@
+ 
+ if (!defined('ABSPATH')) exit;
+ 
+-define('DBDM_VERSION', '1.2.1');
++define('DBDM_VERSION', '1.3.0');
+ define('DBDM_PLUGIN_FILE', __FILE__);
+ define('DBDM_PLUGIN_DIR', plugin_dir_path(__FILE__));
+ define('DBDM_PLUGIN_URL', plugin_dir_url(__FILE__));
+diff --git a/emergency.php b/emergency.php
+index c8508f8..ba2dd1e 100644
+--- a/emergency.php
++++ b/emergency.php
+@@ -669,25 +669,25 @@ function dbdm_em_render_dashboard($notices, $log_content, $log_size, $active_plu
+         <p style="color:var(--muted); font-size:12px; margin:0 0 12px;">Usa queste azioni se il sito è down. Ogni operazione è irreversibile senza un backup.</p>
+         <div class="row">
+             <form method="post" style="display:inline;" onsubmit="return confirm('Disattivare TUTTI i plugin?');">
+-                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
++                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
+                 <input type="hidden" name="a" value="disable_all_plugins">
+                 <button type="submit" class="btn btn-danger btn-sm">🔌 Disattiva tutti i plugin</button>
+             </form>
+ 
+             <form method="post" style="display:inline;" onsubmit="return confirm('Cambiare al tema default? Lo stylesheet e template attuali verranno sostituiti.');">
+-                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
++                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
+                 <input type="hidden" name="a" value="switch_to_default_theme">
+                 <button type="submit" class="btn btn-warn btn-sm">🎨 Cambia a tema default</button>
+             </form>
+ 
+             <form method="post" style="display:inline;">
+-                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
++                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
+                 <input type="hidden" name="a" value="clear_transients">
+                 <button type="submit" class="btn btn-sm">🧹 Svuota transient</button>
+             </form>
+ 
+             <form method="post" style="display:inline;">
+-                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
++                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
+                 <input type="hidden" name="a" value="clear_log">
+                 <button type="submit" class="btn btn-sm">🗑 Svuota debug.log</button>
+             </form>
+@@ -708,7 +708,7 @@ function dbdm_em_render_dashboard($notices, $log_content, $log_size, $active_plu
+                         </td>
+                         <td style="text-align:right;">
+                             <form method="post" style="display:inline;">
+-                                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
++                                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
+                                 <input type="hidden" name="a" value="toggle_const">
+                                 <input type="hidden" name="const" value="<?php echo $name; ?>">
+                                 <input type="hidden" name="enable" value="<?php echo $val === true ? '0' : '1'; ?>">
+@@ -767,7 +767,7 @@ function dbdm_em_render_dashboard($notices, $log_content, $log_size, $active_plu
+                 </div>
+ 
+                 <form method="post" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;" onsubmit="return confirm('Ripristinare questo snapshot? Verranno modificati i plugin attivi/tema nel database.');">
+-                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
++                    <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
+                     <input type="hidden" name="a" value="restore_snapshot">
+                     <input type="hidden" name="snap_id" value="<?php echo htmlspecialchars($snap['id'] ?? '', ENT_QUOTES); ?>">
+                     <label style="font-size:12px; color:var(--text);">
+@@ -796,7 +796,7 @@ function dbdm_em_render_dashboard($notices, $log_content, $log_size, $active_plu
+                             <td><code><?php echo htmlspecialchars($p, ENT_QUOTES); ?></code></td>
+                             <td style="text-align:right;">
+                                 <form method="post" style="display:inline;" onsubmit="return confirm('Disattivare <?php echo htmlspecialchars($p, ENT_QUOTES); ?>?');">
+-                                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
++                                    <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
+                                     <input type="hidden" name="a" value="disable_plugin">
+                                     <input type="hidden" name="plugin" value="<?php echo htmlspecialchars($p, ENT_QUOTES); ?>">
+                                     <button type="submit" class="btn btn-danger btn-sm">Disattiva</button>
+diff --git a/inc/class-emergency.php b/inc/class-emergency.php
+index 7f38495..8cede11 100644
+--- a/inc/class-emergency.php
++++ b/inc/class-emergency.php
+@@ -73,13 +73,6 @@ class DBDM_Emergency {
+         return self::private_dir() . 'emergency-ratelimit.json';
+     }
+ 
+-    /**
+-     * Path del file sessione (per cookie verification).
+-     */
+-    public static function session_path() {
+-        return self::private_dir() . 'emergency-sessions.json';
+-    }
+-
+     const OPTION_DIR_TOKEN   = 'dbdm_private_dir_token';
+ 
+     /**
+@@ -140,7 +133,6 @@ class DBDM_Emergency {
+     public static function clear_log() {
+         @unlink(self::log_path());
+         @unlink(self::rate_limit_path());
+-        @unlink(self::session_path());
+     }
+ 
+     /**

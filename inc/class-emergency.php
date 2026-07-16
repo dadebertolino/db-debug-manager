@@ -66,37 +66,47 @@ class DBDM_Emergency {
      * Path del file log tentativi.
      */
     public static function log_path() {
-        self::ensure_private_dir();
-        return DBDM_PLUGIN_DIR . 'private/emergency-access.log';
+        return self::private_dir() . 'emergency-access.log';
     }
 
     public static function rate_limit_path() {
-        self::ensure_private_dir();
-        return DBDM_PLUGIN_DIR . 'private/emergency-ratelimit.json';
+        return self::private_dir() . 'emergency-ratelimit.json';
     }
 
-    /**
-     * Path del file sessione (per cookie verification).
-     */
-    public static function session_path() {
-        self::ensure_private_dir();
-        return DBDM_PLUGIN_DIR . 'private/emergency-sessions.json';
-    }
+    const OPTION_DIR_TOKEN   = 'dbdm_private_dir_token';
 
     /**
-     * Path della cartella private/ (con trailing slash), garantendone
+     * Path della cartella privata (con trailing slash), garantendone
      * esistenza e protezione. Riusabile dalle altre classi del plugin.
+     *
+     * Il nome contiene un token casuale (private-{16 hex}) così i file
+     * interni (log, snapshot, backup wp-config) non sono raggiungibili
+     * indovinando l'URL nemmeno su server dove .htaccess è ignorato (Nginx).
+     * Il token è salvato in wp_options ed è letto anche da emergency.php.
      */
     public static function private_dir() {
-        self::ensure_private_dir();
-        return DBDM_PLUGIN_DIR . 'private/';
+        $token = get_option(self::OPTION_DIR_TOKEN, '');
+        if (!$token || !preg_match('/^[a-f0-9]{16}$/', $token)) {
+            $token = bin2hex(random_bytes(8));
+            update_option(self::OPTION_DIR_TOKEN, $token, false);
+        }
+
+        $dir    = DBDM_PLUGIN_DIR . 'private-' . $token;
+        $legacy = DBDM_PLUGIN_DIR . 'private';
+
+        // Migrazione: rinomina la vecchia private/ preservando i contenuti.
+        if (!is_dir($dir) && is_dir($legacy)) {
+            @rename($legacy, $dir);
+        }
+
+        self::ensure_private_dir($dir);
+        return $dir . '/';
     }
 
     /**
-     * Crea la cartella private/ con protezioni (htaccess + index).
+     * Crea la cartella privata con protezioni (htaccess + index).
      */
-    private static function ensure_private_dir() {
-        $dir = DBDM_PLUGIN_DIR . 'private';
+    private static function ensure_private_dir($dir) {
         if (!is_dir($dir)) {
             @mkdir($dir, 0755);
         }
@@ -123,7 +133,6 @@ class DBDM_Emergency {
     public static function clear_log() {
         @unlink(self::log_path());
         @unlink(self::rate_limit_path());
-        @unlink(self::session_path());
     }
 
     /**

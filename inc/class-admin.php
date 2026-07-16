@@ -97,6 +97,28 @@ class DBDM_Admin {
 
         foreach (DBDM_Config::MANAGED as $const) {
             $value = !empty($posted[$const]) ? true : false;
+
+            // WP_DEBUG_LOG può essere un path custom (stringa): va preservato.
+            if ($const === 'WP_DEBUG_LOG') {
+                $current = defined('WP_DEBUG_LOG') ? WP_DEBUG_LOG : null;
+                $has_custom_path = is_string($current) && $current !== '';
+
+                if ($value && $has_custom_path) {
+                    continue; // già attiva con path custom: non toccare.
+                }
+                if (!$value && $has_custom_path) {
+                    // Disattivazione: memorizza il path per la riattivazione.
+                    update_option('dbdm_debug_log_path', $current, false);
+                }
+                if ($value && !$has_custom_path) {
+                    // Riattivazione: ripristina l'eventuale path memorizzato.
+                    $saved = get_option('dbdm_debug_log_path', '');
+                    if (is_string($saved) && $saved !== '') {
+                        $value = $saved;
+                    }
+                }
+            }
+
             $result = DBDM_Config::set_constant($const, $value);
             if (is_wp_error($result)) {
                 $errors[] = $const . ': ' . $result->get_error_message();

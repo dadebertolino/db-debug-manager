@@ -60,7 +60,8 @@ $descriptions = array(
                 <tbody>
                 <?php foreach (DBDM_Config::MANAGED as $const):
                     $s = $status[$const];
-                    $is_on = $s['defined'] && $s['value'] === true;
+                    $is_custom_path = $s['defined'] && is_string($s['value']) && $s['value'] !== '';
+                    $is_on = ($s['defined'] && $s['value'] === true) || $is_custom_path;
                     $desc = $descriptions[$const];
                 ?>
                     <tr>
@@ -73,7 +74,10 @@ $descriptions = array(
                         </td>
                         <td><code><?php echo esc_html($const); ?></code></td>
                         <td>
-                            <?php if ($is_on): ?>
+                            <?php if ($is_custom_path): ?>
+                                <span class="db-ui-badge db-ui-badge-success"><?php esc_html_e('Attiva', 'db-debug-manager'); ?></span>
+                                <br><span class="db-ui-text-muted" style="font-size:11px;"><?php esc_html_e('file custom:', 'db-debug-manager'); ?> <code><?php echo esc_html($s['value']); ?></code></span>
+                            <?php elseif ($is_on): ?>
                                 <span class="db-ui-badge db-ui-badge-success"><?php esc_html_e('Attiva', 'db-debug-manager'); ?></span>
                             <?php elseif ($s['defined']): ?>
                                 <span class="db-ui-badge db-ui-badge-muted"><?php esc_html_e('Definita ma false', 'db-debug-manager'); ?></span>
