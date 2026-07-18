@@ -41,7 +41,7 @@ class DBDM_Queries {
         }
 
         $data = array(
-            'url'        => isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : '',
+            'url'        => isset($_SERVER['REQUEST_URI']) ? esc_url_raw(wp_unslash($_SERVER['REQUEST_URI'])) : '',
             'time'       => current_time('mysql'),
             'num'        => count($wpdb->queries),
             'total_time' => 0,

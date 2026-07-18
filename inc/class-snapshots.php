@@ -52,7 +52,7 @@ class DBDM_Snapshots {
         if ($action !== 'update' && $action !== 'install') return;
         if (!in_array($type, array('plugin', 'theme', 'core'), true)) return;
 
-        $note = sprintf(__('Dopo %s %s', 'db-debug-manager'), $action, $type);
+        $note = sprintf(__('Dopo %1$s %2$s', 'db-debug-manager'), $action, $type);
 
         if ($type === 'plugin' && !empty($hook_extra['plugins'])) {
             $note .= ': ' . implode(', ', array_slice((array) $hook_extra['plugins'], 0, 3));
@@ -165,7 +165,8 @@ class DBDM_Snapshots {
         foreach (($a['plugin_versions'] ?? array()) as $k => $v) $va[$k] = $v['version'] ?? '';
         $vb = array();
         foreach (($b['plugin_versions'] ?? array()) as $k => $v) $vb[$k] = $v['version'] ?? '';
-        ksort($va); ksort($vb);
+        ksort($va);
+ksort($vb);
         return $va === $vb;
     }
 
@@ -190,7 +191,9 @@ class DBDM_Snapshots {
 
     public static function delete($id) {
         $all = self::get_all();
-        $filtered = array_values(array_filter($all, function($s) use ($id) { return $s['id'] !== $id; }));
+        $filtered = array_values(array_filter($all, function ($s) use ($id) {
+ return $s['id'] !== $id;
+}));
         return self::write_all($filtered);
     }
 

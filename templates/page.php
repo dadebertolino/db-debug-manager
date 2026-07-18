@@ -1,7 +1,7 @@
 <?php
 /**
  * Template pagina admin principale.
- * Variabili disponibili: $status, $writable, $config_path, $log_path,
+ * Variabili disponibili: $consts_status, $writable, $config_path, $log_path,
  * $log_exists, $log_size, $log_writable, $snapshot, $tab
  */
 if (!defined('ABSPATH')) exit;
@@ -21,7 +21,7 @@ $base_url = admin_url('tools.php?page=' . DBDM_SLUG);
         <?php if ($_GET['updated'] === '1'): ?>
             <div class="db-ui-alert db-ui-alert-success"><span class="db-ui-alert-icon">✅</span><span><?php esc_html_e('Impostazioni salvate. Ricarica la pagina per vedere lo stato aggiornato.', 'db-debug-manager'); ?></span></div>
         <?php else: ?>
-            <div class="db-ui-alert db-ui-alert-danger"><span class="db-ui-alert-icon">⚠️</span><span><?php echo esc_html(isset($_GET['err']) ? rawurldecode($_GET['err']) : __('Errore durante il salvataggio.', 'db-debug-manager')); ?></span></div>
+            <div class="db-ui-alert db-ui-alert-danger"><span class="db-ui-alert-icon">⚠️</span><span><?php echo esc_html(isset($_GET['err']) ? rawurldecode(sanitize_text_field(wp_unslash($_GET['err']))) : __('Errore durante il salvataggio.', 'db-debug-manager')); ?></span></div>
         <?php endif; ?>
     <?php endif; ?>
 
@@ -29,7 +29,7 @@ $base_url = admin_url('tools.php?page=' . DBDM_SLUG);
         <?php if ($_GET['cleared'] === '1'): ?>
             <div class="db-ui-alert db-ui-alert-success"><span class="db-ui-alert-icon">✅</span><span><?php esc_html_e('Log svuotato.', 'db-debug-manager'); ?></span></div>
         <?php else: ?>
-            <div class="db-ui-alert db-ui-alert-danger"><span class="db-ui-alert-icon">⚠️</span><span><?php echo esc_html(isset($_GET['err']) ? rawurldecode($_GET['err']) : __('Errore.', 'db-debug-manager')); ?></span></div>
+            <div class="db-ui-alert db-ui-alert-danger"><span class="db-ui-alert-icon">⚠️</span><span><?php echo esc_html(isset($_GET['err']) ? rawurldecode(sanitize_text_field(wp_unslash($_GET['err']))) : __('Errore.', 'db-debug-manager')); ?></span></div>
         <?php endif; ?>
     <?php endif; ?>
 
@@ -37,7 +37,7 @@ $base_url = admin_url('tools.php?page=' . DBDM_SLUG);
         <?php if ($_GET['em_saved'] === '1'): ?>
             <div class="db-ui-alert db-ui-alert-success"><span class="db-ui-alert-icon">✅</span><span><?php esc_html_e('Impostazioni emergency salvate.', 'db-debug-manager'); ?></span></div>
         <?php else: ?>
-            <div class="db-ui-alert db-ui-alert-danger"><span class="db-ui-alert-icon">⚠️</span><span><?php echo esc_html(isset($_GET['err']) ? rawurldecode($_GET['err']) : __('Errore.', 'db-debug-manager')); ?></span></div>
+            <div class="db-ui-alert db-ui-alert-danger"><span class="db-ui-alert-icon">⚠️</span><span><?php echo esc_html(isset($_GET['err']) ? rawurldecode(sanitize_text_field(wp_unslash($_GET['err']))) : __('Errore.', 'db-debug-manager')); ?></span></div>
         <?php endif; ?>
     <?php endif; ?>
 
@@ -62,7 +62,7 @@ $base_url = admin_url('tools.php?page=' . DBDM_SLUG);
         <div class="db-ui-alert db-ui-alert-success"><span class="db-ui-alert-icon">⏪</span><span><?php esc_html_e('Ripristino completato. Controlla il sito.', 'db-debug-manager'); ?></span></div>
     <?php endif; ?>
     <?php if (isset($_GET['snap_err'])): ?>
-        <div class="db-ui-alert db-ui-alert-danger"><span class="db-ui-alert-icon">⚠️</span><span><?php echo esc_html(rawurldecode($_GET['snap_err'])); ?></span></div>
+        <div class="db-ui-alert db-ui-alert-danger"><span class="db-ui-alert-icon">⚠️</span><span><?php echo esc_html(rawurldecode(sanitize_text_field(wp_unslash($_GET['snap_err'])))); ?></span></div>
     <?php endif; ?>
 
     <h2 class="nav-tab-wrapper dbdm-tabs">

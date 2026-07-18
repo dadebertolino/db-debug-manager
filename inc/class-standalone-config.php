@@ -52,7 +52,7 @@ class DBDM_Standalone_Config {
             'pass'    => $defs['DB_PASSWORD'],
             'host'    => $defs['DB_HOST'],
             'charset' => isset($defs['DB_CHARSET']) ? $defs['DB_CHARSET'] : 'utf8mb4',
-            'prefix'  => $prefix ?: 'wp_',
+            'prefix'  => ($prefix !== '' && $prefix !== null) ? $prefix : 'wp_',
         );
     }
 
@@ -185,10 +185,12 @@ class DBDM_Standalone_Config {
             $ok_valid  = self::run_lint($php, "<?php\n\$dbdm = 1;\n");
             $ok_broken = self::run_lint($php, "<?php\ndefine('X', true;\n");
             if ($ok_valid === 0 && $ok_broken > 0) {
-                return $resolved = $php;
+                $resolved = $php;
+                return $resolved;
             }
         }
-        return $resolved = '';
+        $resolved = '';
+        return $resolved;
     }
 
     /**

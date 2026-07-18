@@ -22,10 +22,10 @@ if ($restore_msgs) {
 ?>
 
 <?php if (!empty($restore_msgs)): ?>
-    <?php foreach ($restore_msgs as $m): ?>
-        <div class="db-ui-alert db-ui-alert-<?php echo $m[0] === 'ok' ? 'success' : ($m[0] === 'warn' ? 'warning' : 'danger'); ?>">
-            <span class="db-ui-alert-icon"><?php echo $m[0] === 'ok' ? '✅' : ($m[0] === 'warn' ? '⚠️' : '❌'); ?></span>
-            <span><?php echo esc_html($m[1]); ?></span>
+    <?php foreach ($restore_msgs as $msg): ?>
+        <div class="db-ui-alert db-ui-alert-<?php echo $msg[0] === 'ok' ? 'success' : ($msg[0] === 'warn' ? 'warning' : 'danger'); ?>">
+            <span class="db-ui-alert-icon"><?php echo $msg[0] === 'ok' ? '✅' : ($msg[0] === 'warn' ? '⚠️' : '❌'); ?></span>
+            <span><?php echo esc_html($msg[1]); ?></span>
         </div>
     <?php endforeach; ?>
 <?php endif; ?>
@@ -52,7 +52,7 @@ if ($restore_msgs) {
             </p>
             <button type="submit" class="db-ui-btn db-ui-btn-primary">📸 <?php esc_html_e('Crea snapshot adesso', 'db-debug-manager'); ?></button>
             <span class="db-ui-text-muted" style="margin-left:12px; font-size:12px;">
-                <?php printf(esc_html__('Massimo %d snapshot, FIFO.', 'db-debug-manager'), DBDM_Snapshots::MAX_SNAPSHOTS); ?>
+                <?php printf(esc_html__('Massimo %d snapshot, FIFO.', 'db-debug-manager'), absint(DBDM_Snapshots::MAX_SNAPSHOTS)); ?>
             </span>
         </form>
     </div>
@@ -62,7 +62,7 @@ if ($restore_msgs) {
     <div class="db-ui-card-header dbdm-log-header">
         <h3><?php esc_html_e('Snapshot disponibili', 'db-debug-manager'); ?></h3>
         <div class="dbdm-log-meta">
-            <span class="db-ui-badge db-ui-badge-muted"><?php echo count($snapshots); ?> / <?php echo DBDM_Snapshots::MAX_SNAPSHOTS; ?></span>
+            <span class="db-ui-badge db-ui-badge-muted"><?php echo absint(count($snapshots)); ?> / <?php echo absint(DBDM_Snapshots::MAX_SNAPSHOTS); ?></span>
             <?php if (!empty($snapshots)): ?>
                 <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;" onsubmit="return confirm('<?php echo esc_js(__('Eliminare tutti gli snapshot?', 'db-debug-manager')); ?>');">
                     <input type="hidden" name="action" value="dbdm_clear_snapshots">
@@ -82,7 +82,8 @@ if ($restore_msgs) {
             </div>
         <?php else: ?>
             <div class="dbdm-snapshots">
-                <?php foreach ($snapshots as $snap):
+                <?php
+                foreach ($snapshots as $snap):
                     $diff = DBDM_Snapshots::diff_with_current($snap);
                     $is_current = DBDM_Snapshots::diff_is_empty($diff);
                     $trigger = $trigger_labels[$snap['trigger']] ?? array($snap['trigger'], 'muted');
@@ -116,20 +117,38 @@ if ($restore_msgs) {
                                 <strong><?php esc_html_e('Differenze rispetto ad adesso:', 'db-debug-manager'); ?></strong>
                                 <ul>
                                     <?php if ($diff['theme_changed']): ?>
-                                        <li>🎨 <?php printf(esc_html__('Tema cambiato: %s → %s', 'db-debug-manager'),
+                                        <li>🎨 
+                                        <?php
+                                        printf(esc_html__('Tema cambiato: %1$s → %2$s', 'db-debug-manager'),
                                             '<code>' . esc_html($diff['theme_changed']['from']) . '</code>',
-                                            '<code>' . esc_html($diff['theme_changed']['to']) . '</code>'); ?></li>
+                                            '<code>' . esc_html($diff['theme_changed']['to']) . '</code>');
+                                            ?>
+                                            </li>
                                     <?php endif; ?>
 
                                     <?php if (!empty($diff['plugins_activated'])): ?>
                                         <li>✅ <?php printf(esc_html__('%d plugin attivati dopo lo snapshot', 'db-debug-manager'), count($diff['plugins_activated'])); ?>:
-                                            <span class="dbdm-plugin-list"><?php echo esc_html(implode(', ', array_map(function($p) { return dirname($p) ?: $p; }, $diff['plugins_activated']))); ?></span>
+                                            <span class="dbdm-plugin-list">
+                                            <?php
+                                            echo esc_html(implode(', ', array_map(function ($p) {
+ $d = dirname($p);
+return ($d && $d !== '.') ? $d : $p;
+}, $diff['plugins_activated'])));
+?>
+</span>
                                         </li>
                                     <?php endif; ?>
 
                                     <?php if (!empty($diff['plugins_deactivated'])): ?>
                                         <li>⛔ <?php printf(esc_html__('%d plugin disattivati dopo lo snapshot', 'db-debug-manager'), count($diff['plugins_deactivated'])); ?>:
-                                            <span class="dbdm-plugin-list"><?php echo esc_html(implode(', ', array_map(function($p) { return dirname($p) ?: $p; }, $diff['plugins_deactivated']))); ?></span>
+                                            <span class="dbdm-plugin-list">
+                                            <?php
+                                            echo esc_html(implode(', ', array_map(function ($p) {
+ $d = dirname($p);
+return ($d && $d !== '.') ? $d : $p;
+}, $diff['plugins_deactivated'])));
+?>
+</span>
                                         </li>
                                     <?php endif; ?>
 

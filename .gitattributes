@@ -1,0 +1,6 @@
+# File di sviluppo: esclusi dallo ZIP generato da `git archive`
+# (e quindi dal pacchetto installabile allegato alle Release).
+/.github        export-ignore
+/.gitattributes export-ignore
+/.gitignore     export-ignore
+/phpcs.xml.dist export-ignore

@@ -3,7 +3,7 @@
 Plugin WordPress per gestire il debug direttamente dal pannello di amministrazione, senza più aprire l'FTP per modificare `wp-config.php` o scaricare `debug.log`. Include un **sistema di accesso emergency standalone** che funziona anche quando WordPress è crashato.
 
 **Autore:** Davide Bertolino · [davidebertolino.it](https://www.davidebertolino.it)
-**Versione:** 1.3.1
+**Versione:** 1.3.2
 **Licenza:** GPL v2 or later
 
 ---
@@ -155,6 +155,11 @@ db-debug-manager/
 ```
 
 ## Changelog
+
+### 1.3.2 — 2026-07-17
+- **CI/QA:** aggiunti GitHub Actions: lint PHP su 7.4 e 8.3, PHPCS con ruleset WPCS (`phpcs.xml.dist`: sicurezza ed escaping bloccanti, stile del progetto preservato) e workflow di release che builda lo ZIP con la cartella `db-debug-manager/` e lo allega alla Release (richiesto dall'auto-updater, che preferisce l'asset .zip allo zipball).
+- **Conformità WPCS:** aggiunti `wp_unslash`/sanitizzazione sugli input, `esc_html__` nei `wp_die`, rinominate variabili che sovrascrivevano global WordPress (`$status`, `$s`, `$m`, `$descriptions`), eliminati short ternary. Nessun cambiamento funzionale (suite di regressione completa verde).
+- Il workflow di release verifica che la versione del tag coincida con header e `DBDM_VERSION`.
 
 ### 1.3.1 — 2026-07-16
 - **Fix:** falsi "Errore di sintassi rilevato" su hosting PHP-FPM: `PHP_BINARY` puntava a php-fpm, che non supporta il lint e falliva su qualsiasi contenuto, bloccando ogni salvataggio delle costanti. Il binario di lint viene ora calibrato (deve accettare codice valido e rifiutare codice rotto) con fallback al `php` CLI di sistema; se nessun binario è utilizzabile il lint viene saltato (best effort, come con `exec` disabilitata).

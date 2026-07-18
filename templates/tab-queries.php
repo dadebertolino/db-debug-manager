@@ -56,7 +56,8 @@ $saveq_on = defined('SAVEQUERIES') && SAVEQUERIES;
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($snapshot['queries'] as $i => $q):
+                <?php
+                foreach ($snapshot['queries'] as $i => $q):
                     $time_ms = $q['time'] * 1000;
                     $slow = $time_ms > 50;
                 ?>

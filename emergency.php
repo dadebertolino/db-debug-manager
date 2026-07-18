@@ -155,7 +155,7 @@ function dbdm_em_record_fail($ip) {
     if (time() - $rl[$ip]['first'] > DBDM_EMERGENCY_LOCKOUT_SEC) {
         $rl[$ip] = array('count' => 0, 'first' => time());
     }
-    $rl[$ip]['count']++;
+    ++$rl[$ip]['count'];
     $rl[$ip]['last'] = time();
     dbdm_em_write_rl($rl);
 }
@@ -311,7 +311,9 @@ if ($is_post && dbdm_em_csrf_check()) {
                     $stmt->execute();
                     $current = @unserialize($stmt->fetchColumn());
                     if (is_array($current)) {
-                        $new = array_values(array_filter($current, function($p) use ($slug) { return $p !== $slug; }));
+                        $new = array_values(array_filter($current, function ($p) use ($slug) {
+ return $p !== $slug;
+}));
                         $pdo->prepare("UPDATE `{$prefix}options` SET option_value = :v WHERE option_name = 'active_plugins'")
                             ->execute(array(':v' => serialize($new)));
                         dbdm_em_log('ACTION', 'disable_plugin: ' . $slug);
@@ -326,13 +328,19 @@ if ($is_post && dbdm_em_csrf_check()) {
                 $candidates = array('twentytwentyfive', 'twentytwentyfour', 'twentytwentythree', 'twentytwentytwo', 'twentytwentyone', 'twentytwenty');
                 $target = null;
                 foreach ($candidates as $t) {
-                    if (is_dir($themes_dir . '/' . $t)) { $target = $t; break; }
+                    if (is_dir($themes_dir . '/' . $t)) { $target = $t;
+break; }
                 }
                 if (!$target) {
                     // Fallback: primo tema trovato.
-                    foreach (@scandir($themes_dir) ?: array() as $entry) {
+                    $theme_entries = @scandir($themes_dir);
+                    if (!is_array($theme_entries)) {
+                        $theme_entries = array();
+                    }
+                    foreach ($theme_entries as $entry) {
                         if ($entry[0] !== '.' && is_dir($themes_dir . '/' . $entry) && file_exists($themes_dir . '/' . $entry . '/style.css')) {
-                            $target = $entry; break;
+                            $target = $entry;
+break;
                         }
                     }
                 }
@@ -348,8 +356,8 @@ if ($is_post && dbdm_em_csrf_check()) {
 
             case 'clear_transients':
                 $deleted = $pdo->exec("DELETE FROM `{$prefix}options` WHERE option_name LIKE '\\_transient\\_%' OR option_name LIKE '\\_site\\_transient\\_%'");
-                dbdm_em_log('ACTION', 'clear_transients: ' . (int)$deleted);
-                $notices[] = array('ok', (int)$deleted . ' transient eliminati.');
+                dbdm_em_log('ACTION', 'clear_transients: ' . (int) $deleted);
+                $notices[] = array('ok', (int) $deleted . ' transient eliminati.');
                 break;
 
             case 'toggle_const':
@@ -396,7 +404,8 @@ if ($is_post && dbdm_em_csrf_check()) {
                 $target = null;
                 if (is_array($all_snaps)) {
                     foreach ($all_snaps as $s) {
-                        if (isset($s['id']) && $s['id'] === $snap_id) { $target = $s; break; }
+                        if (isset($s['id']) && $s['id'] === $snap_id) { $target = $s;
+break; }
                     }
                 }
                 if (!$target) {

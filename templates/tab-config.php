@@ -4,7 +4,7 @@
  */
 if (!defined('ABSPATH')) exit;
 
-$descriptions = array(
+$const_descriptions = array(
     'WP_DEBUG' => array(
         'label' => __('Abilita la modalità debug di WordPress. Richiesta per attivare le altre opzioni.', 'db-debug-manager'),
         'warn'  => false,
@@ -33,7 +33,7 @@ $descriptions = array(
         <span class="db-ui-alert-icon">🔒</span>
         <span>
             <strong><?php esc_html_e('wp-config.php non è scrivibile.', 'db-debug-manager'); ?></strong><br>
-            <?php printf(esc_html__('Percorso rilevato: %s', 'db-debug-manager'), '<code>' . esc_html($config_path ?: 'non trovato') . '</code>'); ?><br>
+            <?php printf(esc_html__('Percorso rilevato: %s', 'db-debug-manager'), '<code>' . esc_html($config_path ? $config_path : 'non trovato') . '</code>'); ?><br>
             <?php esc_html_e('Modifica i permessi del file (consigliato 0644) per poter salvare le impostazioni da qui.', 'db-debug-manager'); ?>
         </span>
     </div>
@@ -58,11 +58,12 @@ $descriptions = array(
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach (DBDM_Config::MANAGED as $const):
-                    $s = $status[$const];
-                    $is_custom_path = $s['defined'] && is_string($s['value']) && $s['value'] !== '';
-                    $is_on = ($s['defined'] && $s['value'] === true) || $is_custom_path;
-                    $desc = $descriptions[$const];
+                <?php
+                foreach (DBDM_Config::MANAGED as $const):
+                    $cs = $consts_status[$const];
+                    $is_custom_path = $cs['defined'] && is_string($cs['value']) && $cs['value'] !== '';
+                    $is_on = ($cs['defined'] && $cs['value'] === true) || $is_custom_path;
+                    $desc = $const_descriptions[$const];
                 ?>
                     <tr>
                         <td>
@@ -76,10 +77,10 @@ $descriptions = array(
                         <td>
                             <?php if ($is_custom_path): ?>
                                 <span class="db-ui-badge db-ui-badge-success"><?php esc_html_e('Attiva', 'db-debug-manager'); ?></span>
-                                <br><span class="db-ui-text-muted" style="font-size:11px;"><?php esc_html_e('file custom:', 'db-debug-manager'); ?> <code><?php echo esc_html($s['value']); ?></code></span>
+                                <br><span class="db-ui-text-muted" style="font-size:11px;"><?php esc_html_e('file custom:', 'db-debug-manager'); ?> <code><?php echo esc_html($cs['value']); ?></code></span>
                             <?php elseif ($is_on): ?>
                                 <span class="db-ui-badge db-ui-badge-success"><?php esc_html_e('Attiva', 'db-debug-manager'); ?></span>
-                            <?php elseif ($s['defined']): ?>
+                            <?php elseif ($cs['defined']): ?>
                                 <span class="db-ui-badge db-ui-badge-muted"><?php esc_html_e('Definita ma false', 'db-debug-manager'); ?></span>
                             <?php else: ?>
                                 <span class="db-ui-badge db-ui-badge-muted"><?php esc_html_e('Non definita', 'db-debug-manager'); ?></span>
@@ -113,7 +114,7 @@ $descriptions = array(
     <div class="db-ui-card-body">
         <table class="db-ui-table">
             <tbody>
-                <tr><td><strong>wp-config.php</strong></td><td><code><?php echo esc_html($config_path ?: '—'); ?></code></td></tr>
+                <tr><td><strong>wp-config.php</strong></td><td><code><?php echo esc_html($config_path ? $config_path : '—'); ?></code></td></tr>
                 <tr><td><strong><?php esc_html_e('Scrivibile', 'db-debug-manager'); ?></strong></td><td><?php echo $writable ? '✅' : '❌'; ?></td></tr>
                 <tr><td><strong>debug.log</strong></td><td><code><?php echo esc_html($log_path); ?></code></td></tr>
                 <tr><td><strong><?php esc_html_e('Log presente', 'db-debug-manager'); ?></strong></td><td><?php echo $log_exists ? '✅ (' . esc_html($log_size) . ')' : '—'; ?></td></tr>

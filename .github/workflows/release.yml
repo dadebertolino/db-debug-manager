@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: "Build ZIP e pubblica Release"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verifica coerenza versione tag / plugin
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          HEADER=$(grep -oP '^\s*\*\s*Version:\s*\K[0-9.]+' db-debug-manager.php)
+          CONST=$(grep -oP "define\('DBDM_VERSION',\s*'\K[0-9.]+" db-debug-manager.php)
+          echo "tag=$TAG header=$HEADER const=$CONST"
+          if [ "$TAG" != "$HEADER" ] || [ "$TAG" != "$CONST" ]; then
+            echo "::error::La versione del tag ($TAG) non coincide con quella del plugin (header: $HEADER, DBDM_VERSION: $CONST)."
+            exit 1
+          fi
+
+      - name: Build ZIP
+        # git archive rispetta gli export-ignore in .gitattributes e imposta
+        # la cartella radice 'db-debug-manager/' (necessaria a WordPress:
+        # lo zip auto-generato da GitHub avrebbe 'db-debug-manager-x.y.z/').
+        run: |
+          git archive --format=zip --prefix=db-debug-manager/ \
+            -o "db-debug-manager-${GITHUB_REF_NAME#v}.zip" "$GITHUB_REF_NAME"
+          unzip -l "db-debug-manager-${GITHUB_REF_NAME#v}.zip" | head -20
+
+      - name: Crea/aggiorna Release con lo ZIP
+        uses: softprops/action-gh-release@v2
+        with:
+          files: db-debug-manager-*.zip
+          generate_release_notes: true
