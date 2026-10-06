@@ -11,6 +11,7 @@ $snapshots = array_reverse($snapshots);
 $trigger_labels = array(
     DBDM_Snapshots::TRIGGER_MANUAL    => array('Manuale', 'primary'),
     DBDM_Snapshots::TRIGGER_EMERGENCY => array('Emergency attivato', 'warning'),
+    DBDM_Snapshots::TRIGGER_PRE_UPGRADE => array('Pre-aggiornamento', 'success'),
     DBDM_Snapshots::TRIGGER_UPGRADE   => array('Post-aggiornamento', 'success'),
 );
 

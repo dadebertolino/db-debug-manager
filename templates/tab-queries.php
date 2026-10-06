@@ -4,8 +4,31 @@
  */
 if (!defined('ABSPATH')) exit;
 
-$saveq_on = defined('SAVEQUERIES') && SAVEQUERIES;
+$saveq_on   = defined('SAVEQUERIES') && SAVEQUERIES;
+$monitor_left = DBDM_Queries::remaining(get_current_user_id());
 ?>
+
+<div class="db-ui-card">
+    <div class="db-ui-card-header">
+        <h3><?php esc_html_e('Registrazione delle query', 'db-debug-manager'); ?></h3>
+    </div>
+    <div class="db-ui-card-body">
+        <p style="margin-top:0;">
+            <?php esc_html_e('Vengono registrate solo le pagine del sito che visiti tu, da amministratore collegato, mentre la registrazione è attiva: mai le visite degli altri utenti, il login, le chiamate REST o AJAX.', 'db-debug-manager'); ?>
+        </p>
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+            <input type="hidden" name="action" value="dbdm_query_monitor">
+            <?php wp_nonce_field('dbdm_query_monitor'); ?>
+            <?php if ($monitor_left > 0): ?>
+                <span class="db-ui-badge db-ui-badge-success"><?php echo esc_html(sprintf(__('Attiva ancora per %d minuti', 'db-debug-manager'), (int) ceil($monitor_left / 60))); ?></span>
+                <button type="submit" class="db-ui-btn db-ui-btn-secondary"><?php esc_html_e('Ferma la registrazione', 'db-debug-manager'); ?></button>
+            <?php else: ?>
+                <input type="hidden" name="start" value="1">
+                <button type="submit" class="db-ui-btn db-ui-btn-primary"><?php esc_html_e('Registra le mie pagine per 30 minuti', 'db-debug-manager'); ?></button>
+            <?php endif; ?>
+        </form>
+    </div>
+</div>
 
 <?php if (!$saveq_on): ?>
     <div class="db-ui-alert db-ui-alert-info">
@@ -32,7 +55,7 @@ $saveq_on = defined('SAVEQUERIES') && SAVEQUERIES;
                 <span class="db-ui-empty-icon">🔎</span>
                 <span class="db-ui-empty-text">
                     <?php esc_html_e('Nessuno snapshot disponibile.', 'db-debug-manager'); ?><br>
-                    <?php esc_html_e('Visita una pagina del sito con SAVEQUERIES attiva e ricarica questa scheda.', 'db-debug-manager'); ?>
+                    <?php esc_html_e('Con SAVEQUERIES attiva e la registrazione accesa, visita una pagina del sito e ricarica questa scheda.', 'db-debug-manager'); ?>
                 </span>
             </div>
         <?php else: ?>

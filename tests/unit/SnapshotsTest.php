@@ -1,0 +1,76 @@
+<?php
+/**
+ * Snapshot: posti per tipo e deduplica (bug 45).
+ *
+ * @package DBDM\Tests
+ */
+
+use Yoast\PHPUnitPolyfills\TestCases\TestCase;
+
+class SnapshotsTest extends TestCase {
+
+	protected function set_up() {
+		parent::set_up();
+		dbdm_test_reset();
+	}
+
+	private function snap( $id, $trigger ) {
+		return array( 'id' => $id, 'trigger' => $trigger );
+	}
+
+	/**
+	 * Bug 45: gli snapshot automatici (uno per aggiornamento) espellevano i
+	 * manuali dai 5 posti comuni.
+	 */
+	public function test_gli_automatici_non_espellono_i_manuali(): void {
+		$all = array();
+		for ( $i = 1; $i <= 5; $i++ ) {
+			$all[] = $this->snap( "m$i", DBDM_Snapshots::TRIGGER_MANUAL );
+		}
+		for ( $i = 1; $i <= 8; $i++ ) {
+			$all[] = $this->snap( "a$i", 0 === $i % 2 ? DBDM_Snapshots::TRIGGER_PRE_UPGRADE : DBDM_Snapshots::TRIGGER_EMERGENCY );
+		}
+
+		$kept = array_column( dbdm_test_call_private( 'DBDM_Snapshots', 'prune', array( $all ) ), 'id' );
+
+		$this->assertSame( array( 'm1', 'm2', 'm3', 'm4', 'm5', 'a4', 'a5', 'a6', 'a7', 'a8' ), $kept, 'ordine conservato, 5 per gruppo, i più recenti' );
+	}
+
+	public function test_i_manuali_oltre_il_limite_espellono_solo_manuali(): void {
+		$all = array( $this->snap( 'a1', DBDM_Snapshots::TRIGGER_UPGRADE ) );
+		for ( $i = 1; $i <= 7; $i++ ) {
+			$all[] = $this->snap( "m$i", DBDM_Snapshots::TRIGGER_MANUAL );
+		}
+
+		$kept = array_column( dbdm_test_call_private( 'DBDM_Snapshots', 'prune', array( $all ) ), 'id' );
+
+		$this->assertSame( array( 'a1', 'm3', 'm4', 'm5', 'm6', 'm7' ), $kept );
+	}
+
+	private function state( array $over = array() ) {
+		return array_merge(
+			array(
+				'active_plugins'  => array( 'a/a.php', 'b/b.php' ),
+				'stylesheet'      => 'tt',
+				'template'        => 'tt',
+				'plugin_versions' => array( 'a/a.php' => array( 'name' => 'A', 'version' => '1.0' ) ),
+				'theme_versions'  => array( 'tt' => array( 'name' => 'TT', 'version' => '1.0' ) ),
+				'wp_version'      => '6.6',
+			),
+			$over
+		);
+	}
+
+	/**
+	 * Bug 45: la deduplica ignorava temi e core.
+	 */
+	public function test_stato_uguale_considera_temi_e_core(): void {
+		$equal = function ( $a, $b ) {
+			return dbdm_test_call_private( 'DBDM_Snapshots', 'states_equal', array( $a, $b ) );
+		};
+		$this->assertTrue( $equal( $this->state(), $this->state( array( 'active_plugins' => array( 'b/b.php', 'a/a.php' ) ) ) ), 'ordine dei plugin irrilevante' );
+		$this->assertFalse( $equal( $this->state(), $this->state( array( 'theme_versions' => array( 'tt' => array( 'name' => 'TT', 'version' => '1.1' ) ) ) ) ) );
+		$this->assertFalse( $equal( $this->state(), $this->state( array( 'wp_version' => '6.7' ) ) ) );
+		$this->assertFalse( $equal( $this->state(), $this->state( array( 'plugin_versions' => array( 'a/a.php' => array( 'name' => 'A', 'version' => '1.1' ) ) ) ) ) );
+	}
+}

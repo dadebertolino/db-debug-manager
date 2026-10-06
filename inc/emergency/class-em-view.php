@@ -174,6 +174,7 @@ class DBDM_Em_View {
                 'manual'            => array('Manuale', 'var(--primary)'),
                 'emergency_enabled' => array('Pre-emergency', 'var(--warn)'),
                 'wp_upgrade'        => array('Post-aggiornamento', 'var(--ok)'),
+                'pre_upgrade'       => array('Pre-aggiornamento', 'var(--ok)'),
             );
             $trig = $trigger_map[$snap['trigger'] ?? 'manual'] ?? array($snap['trigger'] ?? '—', 'var(--muted)');
             $date_fmt = !empty($snap['timestamp']) ? gmdate('j/m/Y H:i', $snap['timestamp']) . ' UTC' : '—';

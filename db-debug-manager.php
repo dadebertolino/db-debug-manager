@@ -29,6 +29,7 @@ require_once DBDM_PLUGIN_DIR . 'inc/class-emergency.php';
 require_once DBDM_PLUGIN_DIR . 'inc/class-snapshots.php';
 require_once DBDM_PLUGIN_DIR . 'inc/class-admin.php';
 require_once DBDM_PLUGIN_DIR . 'inc/class-updater.php';
+require_once DBDM_PLUGIN_DIR . 'inc/class-uninstall.php';
 
 /**
  * Main plugin bootstrap (singleton).
