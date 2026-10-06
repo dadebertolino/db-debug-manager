@@ -341,6 +341,31 @@ class EmergencyCoreTest extends TestCase {
 		$this->assertStringNotContainsString( 'object cache persistente', $html );
 	}
 
+	/**
+	 * Bug 37: l'error log di PHP può essere quello di tutto il server
+	 * (hosting condiviso): solo le voci con i percorsi di questo sito.
+	 */
+	public function test_error_log_solo_voci_del_sito(): void {
+		$log = "[06-Oct-2026 10:00:00 UTC] PHP Warning:  x in /srv/altro/index.php on line 3\n" .
+			"[06-Oct-2026 10:00:01 UTC] PHP Fatal error:  Uncaught Error: y in /srv/sito/wp-content/plugins/rotto/rotto.php:12\n" .
+			"Stack trace:\n" .
+			"#0 {main}\n" .
+			"  thrown in /srv/sito/wp-content/plugins/rotto/rotto.php on line 12\n" .
+			"[06-Oct-2026 10:00:02 UTC] PHP Notice:  z in /srv/altro/b.php on line 1\n" .
+			"riga senza data in /srv/sito-bis/x.php\n" .
+			"[06-Oct-2026 10:00:03 UTC] PHP Warning:  w in /srv/temi/tt/functions.php on line 9\n";
+
+		$this->assertSame(
+			"[06-Oct-2026 10:00:01 UTC] PHP Fatal error:  Uncaught Error: y in /srv/sito/wp-content/plugins/rotto/rotto.php:12\n" .
+			"Stack trace:\n" .
+			"#0 {main}\n" .
+			"  thrown in /srv/sito/wp-content/plugins/rotto/rotto.php on line 12\n" .
+			"[06-Oct-2026 10:00:03 UTC] PHP Warning:  w in /srv/temi/tt/functions.php on line 9\n",
+			DBDM_Em_Status::site_entries( $log, array( '/srv/sito', '/srv/temi/' ) )
+		);
+		$this->assertSame( '', DBDM_Em_Status::site_entries( $log, array() ) );
+	}
+
 	public function test_snapshot_dal_piu_recente(): void {
 		$file = $this->dir . '/snapshots.json';
 		$this->assertSame( array(), DBDM_Em_Status::snapshots( $file ) );
@@ -427,11 +452,57 @@ class EmergencyCoreTest extends TestCase {
 		} );
 	}
 
+	/**
+	 * Risponde con $app e restituisce [pagina, error log di PHP].
+	 */
+	private function dispatch_logged( DBDM_Em_App $app ) {
+		$log      = $this->dir . '/php-errors.log';
+		$previous = ini_set( 'error_log', $log );
+		try {
+			$html = $this->dispatch( $app );
+		} finally {
+			ini_set( 'error_log', $previous );
+		}
+		return array( $html, file_exists( $log ) ? file_get_contents( $log ) : '' );
+	}
+
+	private function sqlite() {
+		if ( ! in_array( 'sqlite', PDO::getAvailableDrivers(), true ) ) {
+			$this->markTestSkipped( 'pdo_sqlite non disponibile' );
+		}
+		return new PDO( 'sqlite::memory:', null, null, array( PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION ) );
+	}
+
+	/**
+	 * Bug 37: prima del login un messaggio unico; il motivo solo nel log.
+	 */
+	private function assert_unavailable( $html, $log, $reason ) {
+		$this->assertStringContainsString( 'Accesso d&#039;emergenza non disponibile.', $html );
+		$this->assertStringNotContainsString( $reason, $html );
+		$this->assertStringContainsString( 'DB Debug Manager emergency: ' . $reason, $log );
+	}
+
 	public function test_database_irraggiungibile(): void {
 		$app = new DBDM_Em_App( $this->site(), function () {
 			return false;
 		} );
-		$this->assertStringContainsString( 'Connessione al database fallita.', $this->dispatch( $app ) );
+		list( $html, $log ) = $this->dispatch_logged( $app );
+		$this->assert_unavailable( $html, $log, 'connessione al database fallita' );
+	}
+
+	public function test_emergency_disattivato_senza_rivelarlo(): void {
+		$pdo = $this->sqlite();
+		$pdo->exec( 'CREATE TABLE wp_options (option_id INTEGER PRIMARY KEY, option_name TEXT UNIQUE, option_value TEXT, autoload TEXT)' );
+		$pdo->exec( "INSERT INTO wp_options (option_name, option_value) VALUES ('dbdm_emergency_enabled', '')" );
+		$app = new DBDM_Em_App( $this->site(), function () use ( $pdo ) {
+			return $pdo;
+		} );
+		list( $html, $log ) = $this->dispatch_logged( $app );
+		$this->assert_unavailable( $html, $log, 'accesso disattivato dal pannello' );
+
+		$pdo->exec( "UPDATE wp_options SET option_value = '1' WHERE option_name = 'dbdm_emergency_enabled'" );
+		list( $html, $log ) = $this->dispatch_logged( $app );
+		$this->assert_unavailable( $html, $log, 'nessuna password configurata' );
 	}
 
 	/**
@@ -439,26 +510,16 @@ class EmergencyCoreTest extends TestCase {
 	 * era gestita: risposta 500 vuota.
 	 */
 	public function test_errore_del_database_pagina_senza_dettagli(): void {
-		if ( ! in_array( 'sqlite', PDO::getAvailableDrivers(), true ) ) {
-			$this->markTestSkipped( 'pdo_sqlite non disponibile' );
-		}
 		// Nessuna tabella: come un $table_prefix che non corrisponde.
-		$pdo = new PDO( 'sqlite::memory:', null, null, array( PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION ) );
+		$pdo = $this->sqlite();
 		$app = new DBDM_Em_App( $this->site(), function () use ( $pdo ) {
 			return $pdo;
 		} );
+		list( $html, $log ) = $this->dispatch_logged( $app );
 
-		$previous = ini_set( 'error_log', $this->dir . '/php-errors.log' );
-		try {
-			$html = $this->dispatch( $app );
-		} finally {
-			ini_set( 'error_log', $previous );
-		}
-
-		$this->assertStringContainsString( 'Accesso non disponibile', $html );
-		$this->assertStringContainsString( 'Errore nella lettura del database', $html );
-		$this->assertStringNotContainsString( 'no such table', $html, 'dettagli solo nel log' );
-		$this->assertStringContainsString( 'no such table', file_get_contents( $this->dir . '/php-errors.log' ) );
+		$this->assert_unavailable( $html, $log, 'errore del database (controlla $table_prefix in wp-config.php)' );
+		$this->assertStringNotContainsString( 'no such table', $html );
+		$this->assertStringContainsString( 'no such table', $log );
 	}
 
 	/* --- Pagine -------------------------------------------------------------- */

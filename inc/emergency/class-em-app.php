@@ -111,17 +111,27 @@ class DBDM_Em_App {
     /**
      * Risponde a una richiesta con la sessione già avviata.
      * 2.0.0 (bug 34): un errore del database (tipicamente $table_prefix che
-     * non corrisponde alle tabelle) dà una pagina d'errore invece di una
-     * risposta 500 vuota; il dettaglio va solo nel log degli errori di PHP.
+     * non corrisponde alle tabelle) dà la pagina "non disponibile" invece di
+     * una risposta 500 vuota; il dettaglio va solo nel log degli errori di PHP.
      */
     public function dispatch(DBDM_Em_Request $request, DBDM_Em_Session $session) {
         $view = new DBDM_Em_View($session);
         try {
             $this->handle($request, $session, $view);
         } catch (PDOException $e) {
-            error_log('DB Debug Manager emergency: ' . $e->getMessage()); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- unico canale per i dettagli, fuori dalla pagina.
-            $view->error('Errore nella lettura del database. Controlla che $table_prefix in wp-config.php corrisponda alle tabelle del sito; il dettaglio è nel log degli errori di PHP.');
+            self::unavailable($view, 'errore del database (controlla $table_prefix in wp-config.php): ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Accesso non disponibile. 2.0.0 (bug 37): prima del login la pagina non
+     * dice perché (stato dell'emergency, password, database, cartella); il
+     * motivo va nel log degli errori di PHP, il pannello WordPress mostra lo
+     * stato all'amministratore.
+     */
+    private static function unavailable(DBDM_Em_View $view, $reason) {
+        error_log('DB Debug Manager emergency: ' . $reason); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- unico canale per il motivo, fuori dalla pagina.
+        $view->error('Accesso d\'emergenza non disponibile.');
     }
 
     private function handle(DBDM_Em_Request $request, DBDM_Em_Session $session, DBDM_Em_View $view) {
@@ -129,17 +139,17 @@ class DBDM_Em_App {
         // Configurazione e database.
         $config_path = DBDM_Standalone_Config::find_wp_config($this->plugin_dir);
         if (!$config_path) {
-            $view->error('wp-config.php non trovato.');
+            self::unavailable($view, 'wp-config.php non trovato');
             return;
         }
         $creds = DBDM_Standalone_Config::parse_credentials($config_path);
         if (!$creds) {
-            $view->error('Impossibile leggere le credenziali da wp-config.php.');
+            self::unavailable($view, 'credenziali del database non leggibili da wp-config.php');
             return;
         }
         $pdo = call_user_func($this->connect, $creds);
         if (!$pdo) {
-            $view->error('Connessione al database fallita.');
+            self::unavailable($view, 'connessione al database fallita');
             return;
         }
         $repo = new DBDM_Em_Repository($pdo, $creds['prefix']);
@@ -147,12 +157,12 @@ class DBDM_Em_App {
         // Attivazione.
         $enabled = $repo->get_option('dbdm_emergency_enabled');
         if (!$enabled || $enabled === '0') {
-            $view->error('L\'accesso emergency è disattivato. Abilitalo dalla dashboard di WordPress: Strumenti → Debug Manager → Emergency.');
+            self::unavailable($view, 'accesso disattivato dal pannello');
             return;
         }
         $stored_hash = $repo->get_option('dbdm_emergency_hash');
         if (empty($stored_hash)) {
-            $view->error('Nessuna password emergency configurata.');
+            self::unavailable($view, 'nessuna password configurata');
             return;
         }
 
@@ -174,12 +184,12 @@ class DBDM_Em_App {
             $paths['content_dir']
         );
         if ($private_dir === '') {
-            $view->error('Cartella privata del plugin non trovata. Apri una volta il pannello Debug Manager da WordPress per crearla.');
+            self::unavailable($view, 'cartella privata non trovata: aprire una volta il pannello Debug Manager in WordPress');
             return;
         }
         if (!is_writable($private_dir)) {
             // Senza cartella scrivibile non c'è limite ai tentativi: accesso negato.
-            $view->error('La cartella privata del plugin non è scrivibile dal server web: accesso negato.');
+            self::unavailable($view, 'cartella privata non scrivibile dal server web');
             return;
         }
         $rl_file = $private_dir . 'emergency-ratelimit.json';
@@ -242,7 +252,7 @@ class DBDM_Em_App {
         ));
         $notices = self::handle_actions($request, $session, $actions, $logger);
 
-        $view->dashboard($notices, DBDM_Em_Status::collect($repo, $config_path, $paths['content_dir'], $private_dir));
+        $view->dashboard($notices, DBDM_Em_Status::collect($repo, $config_path, $paths['content_dir'], $private_dir, array_merge(array(dirname($config_path)), array_values($paths))));
     }
 
     /**

@@ -89,7 +89,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 34 ✅ | C | `emergency.php:210` | `PDOException` non gestita (prefisso tabelle sbagliato) → 500 vuoto | U/E |
 | 35 ✅ | C | `emergency.php` | Mancano `X-Frame-Options`/`frame-ancestors`, `X-Robots-Tag`, `Cache-Control: no-store`; cookie `secure` non rilevato dietro proxy TLS; durata sessione PHP < 30 minuti | E |
 | 36 ✅ | C | `emergency.php` | Log accessi e file del rate limit senza rotazione; righe di log falsificabili con a capo | U/E |
-| 37 | C | `emergency.php:194` | Prima del login rivela se l'emergency è attivo, se c'è una password, se il DB risponde; mostra per intero l'error log del server | E |
+| 37 ✅ | C | `emergency.php:194` | Prima del login rivela se l'emergency è attivo, se c'è una password, se il DB risponde; mostra per intero l'error log del server | E |
 | 38 ✅ | C | `emergency.php:250` | Logout via GET senza CSRF | E |
 
 ### 2.3 Lato WordPress
@@ -117,6 +117,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 57 | C | `admin.js` | Senza `debug.log` al caricamento il viewer non esiste e l'auto-refresh non fa nulla; nessun `.fail()` (nonce scaduto) | E |
 | 58 | C | template | i18n assente (`load_plugin_textdomain`, `Domain Path`); stringhe non traducibili; percorso del backup indicato in modo errato | — |
 | 59 | C | template | Accessibilità: checkbox delle costanti senza etichetta, filtri con solo placeholder, pulsante 🗑 senza nome, `#999` su bianco (2,8:1) | E (axe) |
+| 60 | B | `tab-emergency.php:23` | La regola Nginx suggerita protegge ancora `plugins/db-debug-manager/private`: dalla 1.4.0 la cartella privata è `wp-content/dbdm-private-*` (trovato nella Fase 1) | E |
 
 Legenda (aggiornata alla Fase A, 2026-10-06): ✅ corretto con test · ½ in
 parte (33: `csrf`/`password` come array gestiti, il resto in 2.0.0; 46:
@@ -290,6 +291,11 @@ Ogni flusso utente, nel browser e via HTTP diretto, su una matrice ampia.
 - [x] **Release in due tempi**: **1.4.0** con i bug di priorità A (e i test
       che li provano), poi **2.0.0** a fine piano con refactor ed E2E
       completi. Due tag in tutto.
+
+- [x] **Bug 37** (2026-10-06): prima del login un messaggio unico
+      ("Accesso d'emergenza non disponibile"), il motivo nel log degli errori
+      di PHP; dopo il login l'error log di PHP mostra solo le voci con i
+      percorsi del sito.
 
 Proposte adottate in assenza di indicazioni diverse (da confermare):
 

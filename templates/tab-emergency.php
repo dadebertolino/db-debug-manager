@@ -138,6 +138,7 @@ if (!$dbdm_is_apache):
             <li><?php esc_html_e('Inserisci la password configurata.', 'db-debug-manager'); ?></li>
             <li><?php esc_html_e('Se vedi la dashboard, funziona anche quando WP è morto.', 'db-debug-manager'); ?></li>
         </ol>
+        <p style="margin:10px 0 0;"><?php esc_html_e('Se la pagina dice «Accesso d\'emergenza non disponibile», il motivo (accesso disattivato, password mancante, database, cartella privata) è scritto nel log degli errori di PHP del server: per sicurezza non viene mostrato a chi apre la pagina.', 'db-debug-manager'); ?></p>
     </div>
 </div>
 <?php endif; ?>

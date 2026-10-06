@@ -16,6 +16,8 @@ class DBDM_Em_Status {
 
     const DEBUG_LOG_TAIL = 65536;
     const PHP_LOG_TAIL   = 32768;
+    /** Byte letti dall'error log di PHP prima di tenere solo le voci del sito. */
+    const PHP_LOG_SCAN   = 262144;
 
     /**
      * File in cui WordPress scrive il log con questo valore di WP_DEBUG_LOG,
@@ -91,6 +93,45 @@ class DBDM_Em_Status {
     }
 
     /**
+     * Voci di un error log che riguardano questo sito: quelle in cui
+     * compare uno dei percorsi in $roots. Una voce comincia con una riga
+     * "[data]" e comprende le righe che seguono (stack trace). 2.0.0 (bug
+     * 37): su un hosting condiviso l'error log di PHP può essere quello di
+     * tutto il server.
+     *
+     * @param string   $content
+     * @param string[] $roots
+     * @return string
+     */
+    public static function site_entries($content, array $roots) {
+        $needles = array();
+        foreach ($roots as $root) {
+            if (is_string($root) && trim($root, '/') !== '') $needles[] = rtrim($root, '/') . '/';
+        }
+        if (!$needles) return '';
+
+        $entries = array();
+        foreach (preg_split('/(?<=\n)/', (string) $content) as $line) {
+            if ($line === '') continue;
+            if (!$entries || $line[0] === '[') {
+                $entries[] = $line;
+            } else {
+                $entries[count($entries) - 1] .= $line;
+            }
+        }
+        $out = '';
+        foreach ($entries as $entry) {
+            foreach ($needles as $needle) {
+                if (strpos($entry, $needle) !== false) {
+                    $out .= $entry;
+                    break;
+                }
+            }
+        }
+        return $out;
+    }
+
+    /**
      * Object cache persistente (drop-in wp-content/object-cache.php: Redis,
      * Memcached...). 2.0.0 (bug 27): WordPress legge plugin attivi e tema
      * dalla cache, quindi le modifiche fatte qui nel database possono non
@@ -118,14 +159,19 @@ class DBDM_Em_Status {
      * @param string             $config_path
      * @param string             $content_dir
      * @param string             $private_dir Con slash finale.
+     * @param string[]           $roots       Percorsi del sito, per filtrare
+     *                                        l'error log di PHP.
      * @return array
      */
-    public static function collect(DBDM_Em_Repository $repo, $config_path, $content_dir, $private_dir) {
+    public static function collect(DBDM_Em_Repository $repo, $config_path, $content_dir, $private_dir, array $roots = array()) {
         $log_path      = self::debug_log_path($config_path, $content_dir);
         $php_error_log = ini_get('error_log');
         $php_log       = '';
         if ($php_error_log && file_exists($php_error_log) && is_readable($php_error_log)) {
-            $php_log = self::tail_bytes($php_error_log, self::PHP_LOG_TAIL);
+            $php_log = self::site_entries(self::tail_bytes($php_error_log, self::PHP_LOG_SCAN), $roots);
+            if (strlen($php_log) > self::PHP_LOG_TAIL) {
+                $php_log = substr($php_log, -self::PHP_LOG_TAIL);
+            }
         }
         $active = $repo->active_plugins();
 

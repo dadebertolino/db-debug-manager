@@ -259,9 +259,9 @@ class DBDM_Em_View {
         <?php elseif (!file_exists($php_error_log)): ?>
             <p style="color:var(--muted);">Path: <code><?php echo htmlspecialchars($php_error_log, ENT_QUOTES | ENT_SUBSTITUTE); ?></code> (non esistente).</p>
         <?php elseif (!$php_log_content): ?>
-            <p style="color:var(--muted);">Path: <code><?php echo htmlspecialchars($php_error_log, ENT_QUOTES | ENT_SUBSTITUTE); ?></code> (vuoto o non leggibile).</p>
+            <p style="color:var(--muted);">Path: <code><?php echo htmlspecialchars($php_error_log, ENT_QUOTES | ENT_SUBSTITUTE); ?></code> (vuoto, non leggibile o senza voci di questo sito).</p>
         <?php else: ?>
-            <p style="color:var(--muted); font-size:11px; margin:0 0 8px;">Path: <code><?php echo htmlspecialchars($php_error_log, ENT_QUOTES | ENT_SUBSTITUTE); ?></code></p>
+            <p style="color:var(--muted); font-size:11px; margin:0 0 8px;">Path: <code><?php echo htmlspecialchars($php_error_log, ENT_QUOTES | ENT_SUBSTITUTE); ?></code> · solo le voci di questo sito</p>
             <pre class="log"><?php echo htmlspecialchars($php_log_content, ENT_QUOTES | ENT_SUBSTITUTE); ?></pre>
         <?php endif; ?>
     </div>
