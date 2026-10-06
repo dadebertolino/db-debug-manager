@@ -56,6 +56,27 @@ class DBDM_Config {
     }
 
     /**
+     * Come mostrare una costante nel pannello. Attiva = valore vero per PHP
+     * (2.0.0, bug 6: `define( 'WP_DEBUG', 1 )` risultava spenta e il
+     * salvataggio successivo scriveva false). Per WP_DEBUG_LOG un percorso
+     * personalizzato è una stringa diversa da '1'/'true', come in
+     * wp_debug_mode() (bug 7).
+     *
+     * @param string $const
+     * @param array  $status Voce di get_status(): defined, value.
+     * @return array{on:bool,custom_path:string}
+     */
+    public static function constant_state($const, array $status) {
+        $value = !empty($status['defined']) ? $status['value'] : null;
+        $on    = (bool) $value;
+        $path  = '';
+        if ($const === 'WP_DEBUG_LOG' && $on && is_string($value) && !in_array(strtolower($value), array('1', 'true'), true)) {
+            $path = $value;
+        }
+        return array('on' => $on, 'custom_path' => $path);
+    }
+
+    /**
      * Imposta una costante in wp-config.php.
      * La modifica ha effetto al prossimo caricamento di WP.
      *

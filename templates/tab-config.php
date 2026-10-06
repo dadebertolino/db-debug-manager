@@ -61,8 +61,9 @@ $const_descriptions = array(
                 <?php
                 foreach (DBDM_Config::MANAGED as $const):
                     $cs = $consts_status[$const];
-                    $is_custom_path = $cs['defined'] && is_string($cs['value']) && $cs['value'] !== '';
-                    $is_on = ($cs['defined'] && $cs['value'] === true) || $is_custom_path;
+                    $state = DBDM_Config::constant_state($const, $cs);
+                    $is_custom_path = $state['custom_path'] !== '';
+                    $is_on = $state['on'];
                     $desc = $const_descriptions[$const];
                 ?>
                     <tr>
@@ -77,11 +78,11 @@ $const_descriptions = array(
                         <td>
                             <?php if ($is_custom_path): ?>
                                 <span class="db-ui-badge db-ui-badge-success"><?php esc_html_e('Attiva', 'db-debug-manager'); ?></span>
-                                <br><span class="db-ui-text-muted" style="font-size:11px;"><?php esc_html_e('file custom:', 'db-debug-manager'); ?> <code><?php echo esc_html($cs['value']); ?></code></span>
+                                <br><span class="db-ui-text-muted" style="font-size:11px;"><?php esc_html_e('file custom:', 'db-debug-manager'); ?> <code><?php echo esc_html($state['custom_path']); ?></code></span>
                             <?php elseif ($is_on): ?>
                                 <span class="db-ui-badge db-ui-badge-success"><?php esc_html_e('Attiva', 'db-debug-manager'); ?></span>
                             <?php elseif ($cs['defined']): ?>
-                                <span class="db-ui-badge db-ui-badge-muted"><?php esc_html_e('Definita ma false', 'db-debug-manager'); ?></span>
+                                <span class="db-ui-badge db-ui-badge-muted"><?php esc_html_e('Definita, disattiva', 'db-debug-manager'); ?></span>
                             <?php else: ?>
                                 <span class="db-ui-badge db-ui-badge-muted"><?php esc_html_e('Non definita', 'db-debug-manager'); ?></span>
                             <?php endif; ?>
