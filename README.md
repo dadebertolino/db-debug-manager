@@ -161,6 +161,7 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Emergency: avviso con object cache persistente** (Redis, Memcached): le modifiche ai plugin attivi e al tema possono non avere effetto finché la cache non viene svuotata.
 - **Fix (emergency): log degli accessi senza limite e falsificabile.** Ora ruota a 1 MB (una copia precedente) e gli a capo inviati dal client (User-Agent, campi dei moduli) non possono più creare righe false.
 - **Sicurezza (emergency): header contro framing, indicizzazione e cache** (`X-Frame-Options`, `frame-ancestors`, `X-Robots-Tag`, `Cache-Control: no-store`, `Referrer-Policy`, `nosniff`). Il cookie di sessione è `secure` anche dietro un proxy che termina HTTPS.
 - **Fix (emergency): logout tramite un semplice link.** Una pagina esterna poteva chiudere la sessione d'emergenza; ora il logout è un modulo con token.

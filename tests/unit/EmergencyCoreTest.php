@@ -305,6 +305,42 @@ class EmergencyCoreTest extends TestCase {
 		$this->assertStringContainsString( '<span class="tag tag-warn">da verificare</span>', $html );
 	}
 
+	/**
+	 * Bug 27: con una object cache persistente le modifiche fatte
+	 * dall'emergency possono non avere effetto: va detto.
+	 */
+	public function test_rileva_la_object_cache_persistente(): void {
+		$this->assertFalse( DBDM_Em_Status::has_object_cache( $this->dir ) );
+		file_put_contents( $this->dir . '/object-cache.php', '<?php' );
+		$this->assertTrue( DBDM_Em_Status::has_object_cache( $this->dir ) );
+	}
+
+	public function test_avviso_object_cache_nella_dashboard(): void {
+		$store = array();
+		$view  = new DBDM_Em_View( new DBDM_Em_Session( $store ) );
+		$data  = array(
+			'log_content'     => '',
+			'log_size'        => 0,
+			'active_plugins'  => array(),
+			'cur_theme'       => 'tt',
+			'consts_status'   => array(),
+			'php_error_log'   => '',
+			'php_log_content' => '',
+			'snapshots'       => array(),
+			'object_cache'    => true,
+		);
+		$html = $this->render( function () use ( $view, $data ) {
+			$view->dashboard( array(), $data );
+		} );
+		$this->assertStringContainsString( 'object cache persistente', $html );
+
+		$data['object_cache'] = false;
+		$html = $this->render( function () use ( $view, $data ) {
+			$view->dashboard( array(), $data );
+		} );
+		$this->assertStringNotContainsString( 'object cache persistente', $html );
+	}
+
 	public function test_snapshot_dal_piu_recente(): void {
 		$file = $this->dir . '/snapshots.json';
 		$this->assertSame( array(), DBDM_Em_Status::snapshots( $file ) );

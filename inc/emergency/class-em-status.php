@@ -91,6 +91,16 @@ class DBDM_Em_Status {
     }
 
     /**
+     * Object cache persistente (drop-in wp-content/object-cache.php: Redis,
+     * Memcached...). 2.0.0 (bug 27): WordPress legge plugin attivi e tema
+     * dalla cache, quindi le modifiche fatte qui nel database possono non
+     * avere effetto finché la cache non viene svuotata.
+     */
+    public static function has_object_cache($content_dir) {
+        return file_exists($content_dir . '/object-cache.php');
+    }
+
+    /**
      * Snapshot salvati dal pannello, dal più recente.
      */
     public static function snapshots($file) {
@@ -128,6 +138,7 @@ class DBDM_Em_Status {
             'php_error_log'   => $php_error_log,
             'php_log_content' => $php_log,
             'snapshots'       => self::snapshots($private_dir . 'snapshots.json'),
+            'object_cache'    => self::has_object_cache($content_dir),
         );
     }
 }

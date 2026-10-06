@@ -71,6 +71,7 @@ class DBDM_Em_View {
         $php_error_log   = $data['php_error_log'];
         $php_log_content = $data['php_log_content'];
         $snapshots       = $data['snapshots'];
+        $object_cache    = !empty($data['object_cache']);
         $this->header('Debug Manager — Emergency Dashboard');
         ?>
 <div class="wrap">
@@ -91,6 +92,10 @@ class DBDM_Em_View {
     <?php foreach ($notices as $n): ?>
         <div class="notice notice-<?php echo in_array($n[0], array('ok', 'warn'), true) ? $n[0] : 'err'; ?>"><?php echo htmlspecialchars($n[1], ENT_QUOTES | ENT_SUBSTITUTE); ?></div>
     <?php endforeach; ?>
+
+    <?php if ($object_cache): ?>
+        <div class="notice notice-warn">Il sito usa una object cache persistente (<code>object-cache.php</code>: Redis, Memcached…). WordPress potrebbe continuare a usare plugin e tema in cache: dopo un'azione, svuota la cache dal pannello dell'hosting o del server di cache.</div>
+    <?php endif; ?>
 
     <div class="panel panel-danger">
         <h2>⚡ Azioni rapide di ripristino</h2>
