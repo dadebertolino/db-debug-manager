@@ -159,6 +159,10 @@ db-debug-manager/
 
 ## Changelog
 
+### Non rilasciata
+
+- **Interno: `emergency.php` diviso in classi** (`inc/emergency/`: richiesta, sessione e CSRF, accesso al database, log degli accessi, azioni, stato del sito, pagine, flusso). L'URL e il comportamento non cambiano; le parti si possono ora provare con test automatici.
+
 ### 1.4.0 — Sicurezza dell'emergency e di wp-config.php — 2026-10-06
 
 Prima release del piano di test (`TESTING-PLAN.md`): corregge tutti i difetti di priorità A trovati dall'audit, ciascuno con un test automatico.

@@ -574,9 +574,10 @@ function dbdm_test_set_static( $class, $property, $value ) {
 }
 
 // Carica i sorgenti sotto test: le classi sono solo definizioni, nessun
-// codice viene eseguito al require. emergency.php e db-debug-manager.php no:
-// eseguono codice al caricamento.
-foreach ( glob( DBDM_TEST_ROOT . '/inc/class-*.php' ) as $dbdm_file ) {
+// codice viene eseguito al require (anche le classi dell'emergency in
+// inc/emergency/). emergency.php e db-debug-manager.php no: eseguono codice
+// al caricamento.
+foreach ( array_merge( glob( DBDM_TEST_ROOT . '/inc/class-*.php' ), glob( DBDM_TEST_ROOT . '/inc/emergency/class-*.php' ) ) as $dbdm_file ) {
 	require_once $dbdm_file;
 }
 
