@@ -16,12 +16,36 @@ class DBDM_Em_App {
     /** @var string Cartella del plugin, senza slash finale. */
     private $plugin_dir;
 
-    /** @var string wp-content: due livelli sopra la cartella del plugin. */
-    private $content_dir;
-
     public function __construct($plugin_dir) {
-        $this->plugin_dir  = rtrim($plugin_dir, '/');
-        $this->content_dir = dirname(dirname($this->plugin_dir));
+        $this->plugin_dir = rtrim($plugin_dir, '/');
+    }
+
+    /**
+     * wp-content, plugin e temi del sito. 2.0.0 (bug 21): dai percorsi
+     * salvati da WordPress (DBDM_Emergency::site_paths(), che conosce
+     * WP_CONTENT_DIR, WP_PLUGIN_DIR e la cartella dei temi), ciascuno solo
+     * se è una cartella esistente; altrimenti dalla posizione del plugin
+     * (wp-content/plugins/db-debug-manager).
+     *
+     * @param mixed  $saved      Opzione dbdm_site_paths.
+     * @param string $plugin_dir
+     * @return array{content_dir:string,plugins_dir:string,themes_dir:string}
+     */
+    public static function site_paths($saved, $plugin_dir) {
+        $plugins = dirname(rtrim($plugin_dir, '/'));
+        $content = dirname($plugins);
+        $paths   = array(
+            'content_dir' => $content,
+            'plugins_dir' => $plugins,
+            'themes_dir'  => $content . '/themes',
+        );
+        foreach ($paths as $key => $default) {
+            $value = is_array($saved) && isset($saved[$key]) ? $saved[$key] : null;
+            if (is_string($value) && $value !== '' && $value[0] === '/' && is_dir($value)) {
+                $paths[$key] = rtrim($value, '/');
+            }
+        }
+        return $paths;
     }
 
     /**
@@ -91,11 +115,13 @@ class DBDM_Em_App {
             $repo->get_option('dbdm_emergency_epoch', '')
         );
 
+        $paths = self::site_paths($repo->get_option('dbdm_site_paths'), $this->plugin_dir);
+
         // Cartella privata (log accessi, limite tentativi, snapshot, backup).
         $private_dir = self::resolve_private_dir(
             $repo->get_option('dbdm_private_dir_path', ''),
             $repo->get_option('dbdm_private_dir_token', ''),
-            $this->content_dir
+            $paths['content_dir']
         );
         if ($private_dir === '') {
             $view->error('Cartella privata del plugin non trovata. Apri una volta il pannello Debug Manager da WordPress per crearla.');
@@ -164,16 +190,14 @@ class DBDM_Em_App {
         // Azioni: tutte quelle che modificano lo stato richiedono POST + CSRF.
         $notices = array();
         if ($request->is_post() && $session->csrf_check($request->post_string('csrf'))) {
-            $actions = new DBDM_Em_Actions($repo, $logger, array(
+            $actions = new DBDM_Em_Actions($repo, $logger, $paths + array(
                 'config_path' => $config_path,
                 'private_dir' => $private_dir,
-                'content_dir' => $this->content_dir,
-                'plugins_dir' => dirname($this->plugin_dir),
             ));
             $notices = $actions->run($action, $request);
         }
 
-        $view->dashboard($notices, DBDM_Em_Status::collect($repo, $config_path, $this->content_dir, $private_dir));
+        $view->dashboard($notices, DBDM_Em_Status::collect($repo, $config_path, $paths['content_dir'], $private_dir));
     }
 
     private function redirect(DBDM_Em_Request $request) {

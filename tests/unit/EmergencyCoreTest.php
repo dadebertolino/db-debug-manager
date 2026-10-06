@@ -203,6 +203,39 @@ class EmergencyCoreTest extends TestCase {
 		$this->assertSame( '', DBDM_Em_App::resolve_private_dir( array(), null, $this->dir ) );
 	}
 
+	/* --- Percorsi del sito (bug 21) ----------------------------------------- */
+
+	public function test_percorsi_del_sito_salvati_da_wordpress(): void {
+		foreach ( array( 'content', 'plugins', 'themes' ) as $d ) {
+			mkdir( $this->dir . '/' . $d );
+		}
+		$saved = array(
+			'content_dir' => $this->dir . '/content',
+			'plugins_dir' => $this->dir . '/plugins',
+			'themes_dir'  => $this->dir . '/themes/',
+		);
+		$this->assertSame(
+			array(
+				'content_dir' => $this->dir . '/content',
+				'plugins_dir' => $this->dir . '/plugins',
+				'themes_dir'  => $this->dir . '/themes',
+			),
+			DBDM_Em_App::site_paths( $saved, '/srv/wp/wp-content/plugins/db-debug-manager' )
+		);
+	}
+
+	public function test_percorsi_del_sito_di_ripiego(): void {
+		$fallback = array(
+			'content_dir' => '/srv/wp/wp-content',
+			'plugins_dir' => '/srv/wp/wp-content/plugins',
+			'themes_dir'  => '/srv/wp/wp-content/themes',
+		);
+		$plugin   = '/srv/wp/wp-content/plugins/db-debug-manager';
+		$this->assertSame( $fallback, DBDM_Em_App::site_paths( null, $plugin ), 'opzione assente' );
+		$this->assertSame( $fallback, DBDM_Em_App::site_paths( 'a:0:{}', $plugin ), 'non un elenco' );
+		$this->assertSame( $fallback, DBDM_Em_App::site_paths( array( 'content_dir' => $this->dir . '/manca', 'themes_dir' => array(), 'plugins_dir' => 'relativo' ), $plugin ), 'cartelle inesistenti o non valide' );
+	}
+
 	/* --- Pagine -------------------------------------------------------------- */
 
 	private function render( callable $fn ) {

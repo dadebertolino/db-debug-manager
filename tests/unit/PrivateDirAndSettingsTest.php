@@ -44,6 +44,23 @@ class PrivateDirAndSettingsTest extends TestCase {
 		$this->assertSame( $dir, DBDM_Emergency::private_dir() );
 	}
 
+	/**
+	 * Bug 21: l'emergency ricavava wp-content, temi e plugin dalla propria
+	 * posizione. WordPress salva i percorsi veri insieme alla cartella privata.
+	 */
+	public function test_percorsi_del_sito_salvati_per_l_emergency(): void {
+		DBDM_Emergency::private_dir();
+
+		$this->assertSame(
+			array(
+				'content_dir' => WP_CONTENT_DIR,
+				'plugins_dir' => WP_CONTENT_DIR . '/plugins',
+				'themes_dir'  => WP_CONTENT_DIR . '/temi-registrati',
+			),
+			get_option( DBDM_Emergency::OPTION_SITE_PATHS )
+		);
+	}
+
 	public function test_migrazione_dalla_cartella_del_plugin(): void {
 		$token = 'abcdef0123456789';
 		update_option( DBDM_Emergency::OPTION_DIR_TOKEN, $token );

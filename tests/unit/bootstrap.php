@@ -508,6 +508,12 @@ if ( ! function_exists( 'wp_normalize_path' ) ) {
 		return preg_replace( '|(?<=.)/+|', '/', str_replace( '\\', '/', (string) $path ) );
 	}
 }
+if ( ! function_exists( 'get_theme_root' ) ) {
+	// Diversa da WP_CONTENT_DIR/themes: i test vedono quale percorso è usato.
+	function get_theme_root() {
+		return WP_CONTENT_DIR . '/temi-registrati';
+	}
+}
 if ( ! function_exists( 'size_format' ) ) {
 	function size_format( $bytes, $decimals = 0 ) {
 		return $bytes . ' B';

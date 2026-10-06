@@ -73,7 +73,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 18 ✅ | B | `emergency.php:807` | Iniezione JS nel `confirm()` del pulsante "Disattiva" (slug con apostrofo) | E |
 | 19 ✅ | B | `emergency.php:826,840` | Pannelli del log vuoti con UTF-8 non valido (taglio a metà carattere, Latin-1) | E |
 | 20 ✅ | B | `emergency.php:363` | Il toggle `WP_DEBUG_LOG` dall'emergency perde il percorso personalizzato (il pannello lo conserva) | E |
-| 21 | B | `emergency.php:379,475,327` | Percorsi fissi: `wp-content/debug.log`, cartella temi; ignorati `WP_DEBUG_LOG` stringa e `WP_CONTENT_DIR` | U/E |
+| 21 ✅ | B | `emergency.php:379,475,327` | Percorsi fissi: `wp-content/debug.log`, cartella temi; ignorati `WP_DEBUG_LOG` stringa e `WP_CONTENT_DIR` | U/E |
 | 22 ✅ | B | `class-standalone-config.php:62,82` | Define in commenti o condizionali possono sovrascrivere le credenziali (vince l'ultima, in PHP la prima); stesso per `$table_prefix` | U |
 | 23 ✅ | B | `class-standalone-config.php:68` | Backslash nelle password alterati (`stripslashes`); valori con `);` troncati | U |
 | 24 ✅ | B | `class-standalone-config.php:231` | `DB_HOST` con socket o IPv6 interpretato male | U |

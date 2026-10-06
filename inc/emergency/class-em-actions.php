@@ -35,11 +35,15 @@ class DBDM_Em_Actions {
     /** @var string */
     private $plugins_dir;
 
+    /** @var string */
+    private $themes_dir;
+
     /**
      * @param DBDM_Em_Repository $repo
      * @param DBDM_Em_Logger     $logger
      * @param array              $paths config_path, private_dir (con slash
-     *                                  finale), content_dir, plugins_dir.
+     *                                  finale), content_dir, plugins_dir,
+     *                                  themes_dir.
      */
     public function __construct(DBDM_Em_Repository $repo, DBDM_Em_Logger $logger, array $paths) {
         $this->repo        = $repo;
@@ -48,6 +52,7 @@ class DBDM_Em_Actions {
         $this->private_dir = $paths['private_dir'];
         $this->content_dir = $paths['content_dir'];
         $this->plugins_dir = $paths['plugins_dir'];
+        $this->themes_dir  = $paths['themes_dir'];
     }
 
     /**
@@ -94,9 +99,9 @@ class DBDM_Em_Actions {
     }
 
     private function switch_to_default_theme(DBDM_Em_Request $request) {
-        $target = self::default_theme($this->content_dir . '/themes');
+        $target = self::default_theme($this->themes_dir);
         if (!$target) {
-            return array(array('err', 'Nessun tema alternativo trovato in /wp-content/themes.'));
+            return array(array('err', 'Nessun tema alternativo trovato in ' . $this->themes_dir . '.'));
         }
         $this->repo->update_option('template', $target);
         $this->repo->update_option('stylesheet', $target);
@@ -231,7 +236,7 @@ class DBDM_Em_Actions {
         // Tema. 1.4.0: il tema padre viene letto dal tema e deve essere
         // installato, altrimenti il sito resterebbe bianco.
         if ($restore_theme && isset($target['stylesheet'])) {
-            $theme = DBDM_Emergency_Guard::restorable_theme($target['stylesheet'], $this->content_dir . '/themes');
+            $theme = DBDM_Emergency_Guard::restorable_theme($target['stylesheet'], $this->themes_dir);
             if ($theme['ok']) {
                 $this->repo->update_option('stylesheet', $theme['stylesheet']);
                 $this->repo->update_option('template', $theme['template']);

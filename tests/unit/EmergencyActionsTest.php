@@ -37,7 +37,8 @@ class EmergencyActionsTest extends TestCase {
 		mkdir( $this->private, 0750, true );
 		mkdir( $this->content . '/plugins/a', 0755, true );
 		mkdir( $this->content . '/plugins/b', 0755, true );
-		mkdir( $this->content . '/themes', 0755, true );
+		// Temi in una cartella diversa da wp-content/themes (bug 21).
+		mkdir( $this->content . '/temi', 0755, true );
 		touch( $this->content . '/plugins/a/a.php' );
 		touch( $this->content . '/plugins/b/b.php' );
 		copy( DBDM_TEST_ROOT . '/tests/fixtures/wp-config/standard.php', $this->config );
@@ -86,8 +87,8 @@ class EmergencyActionsTest extends TestCase {
 	}
 
 	private function theme( $slug, $template = '' ) {
-		mkdir( $this->content . '/themes/' . $slug );
-		file_put_contents( $this->content . '/themes/' . $slug . '/style.css', "/*\nTheme Name: $slug\n" . ( $template ? "Template: $template\n" : '' ) . '*/' );
+		mkdir( $this->content . '/temi/' . $slug );
+		file_put_contents( $this->content . '/temi/' . $slug . '/style.css', "/*\nTheme Name: $slug\n" . ( $template ? "Template: $template\n" : '' ) . '*/' );
 	}
 
 	private function run_action( $action, array $post = array() ) {
@@ -99,6 +100,7 @@ class EmergencyActionsTest extends TestCase {
 				'private_dir' => $this->private,
 				'content_dir' => $this->content,
 				'plugins_dir' => $this->content . '/plugins',
+				'themes_dir'  => $this->content . '/temi',
 			)
 		);
 		return $actions->run( $action, new DBDM_Em_Request( array(), $post, array( 'REQUEST_METHOD' => 'POST' ) ) );
@@ -178,9 +180,9 @@ class EmergencyActionsTest extends TestCase {
 	}
 
 	public function test_senza_temi_default_il_primo_con_style_css(): void {
-		mkdir( $this->content . '/themes/vuoto' );
+		mkdir( $this->content . '/temi/vuoto' );
 		$this->theme( 'mio' );
-		$this->assertSame( 'mio', DBDM_Em_Actions::default_theme( $this->content . '/themes' ) );
+		$this->assertSame( 'mio', DBDM_Em_Actions::default_theme( $this->content . '/temi' ) );
 	}
 
 	public function test_nessun_tema_disponibile(): void {
