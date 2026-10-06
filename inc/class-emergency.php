@@ -127,9 +127,8 @@ class DBDM_Emergency {
      */
     public static function private_dir() {
         $token = get_option(self::OPTION_DIR_TOKEN, '');
-        if (!$token || !preg_match('/^[a-f0-9]{16}$/', $token)) {
-            $token = bin2hex(random_bytes(8));
-            update_option(self::OPTION_DIR_TOKEN, $token, false);
+        if (!self::valid_token($token)) {
+            $token = self::create_token();
         }
 
         $dir = WP_CONTENT_DIR . '/dbdm-private-' . $token;
@@ -146,6 +145,39 @@ class DBDM_Emergency {
             update_option(self::OPTION_SITE_PATHS, $paths, false);
         }
         return $dir . '/';
+    }
+
+    private static function valid_token($token) {
+        return is_string($token) && preg_match('/^[a-f0-9]{16}$/', $token);
+    }
+
+    /**
+     * Nuovo token della cartella privata. 2.0.0 (bug 55): inserimento
+     * atomico (INSERT IGNORE); se un'altra richiesta lo ha appena creato
+     * vale il suo. add_option() non basta: con l'opzione assente nella
+     * cache fa INSERT ... ON DUPLICATE KEY UPDATE e sovrascrive.
+     */
+    private static function create_token() {
+        global $wpdb;
+        $new = bin2hex(random_bytes(8));
+        $wpdb->query($wpdb->prepare(
+            "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')",
+            self::OPTION_DIR_TOKEN,
+            $new
+        ));
+        $stored = $wpdb->get_var($wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
+            self::OPTION_DIR_TOKEN
+        ));
+        wp_cache_delete(self::OPTION_DIR_TOKEN, 'options');
+        wp_cache_delete('notoptions', 'options');
+        wp_cache_delete('alloptions', 'options');
+        if (self::valid_token($stored)) {
+            return $stored;
+        }
+        // Valore presente ma non valido: si sostituisce.
+        update_option(self::OPTION_DIR_TOKEN, $new, false);
+        return $new;
     }
 
     /**
@@ -207,12 +239,16 @@ class DBDM_Emergency {
     private static function ensure_private_dir($dir) {
         if (!is_dir($dir)) {
             @mkdir($dir, 0750);
+            // Creata da root (WP-CLI): stesso proprietario di wp-content (bug 55).
+            DBDM_Standalone_Config::restore_owner($dir, @fileowner(dirname($dir)), @filegroup(dirname($dir)));
         }
         if (!file_exists($dir . '/.htaccess')) {
             @file_put_contents($dir . '/.htaccess', self::htaccess_rules());
+            DBDM_Standalone_Config::restore_owner($dir . '/.htaccess', @fileowner($dir), @filegroup($dir));
         }
         if (!file_exists($dir . '/index.php')) {
             @file_put_contents($dir . '/index.php', "<?php // Silence is golden.\n");
+            DBDM_Standalone_Config::restore_owner($dir . '/index.php', @fileowner($dir), @filegroup($dir));
         }
     }
 

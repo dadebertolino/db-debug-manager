@@ -54,7 +54,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 4 ✅ | A | `class-standalone-config.php:101` | Define con commento in coda, `defined() \|\| define()`, `if (!defined) define`, define su più righe, copia commentata prima di quella attiva, define in un file incluso: viene **inserito un duplicato**. Il toggle non ha effetto, l'admin vede "salvate", PHP 8 emette "already defined" a ogni richiesta | U (tabella di varianti, una sola define attiva col valore atteso) + I |
 | 5 ✅ | B | `class-standalone-config.php:115` | Senza il marker "That's all" e con `require` (non `_once`) o indentato, la define finisce dopo `wp-settings.php`: nessun effetto | U |
 | 6 ✅ | B | `tab-config.php:64` | `define('WP_DEBUG', 1)` mostrato come spento; salvando un'altra costante si scrive `false` | U/I |
-| 7 ½ | B | `class-log.php:16`, `tab-config.php:64` | `WP_DEBUG_LOG` `'true'`/`'1'` trattato come percorso di file (il core lo intende come `wp-content/debug.log`); `ini error_log` ignorato | U |
+| 7 ✅ | B | `class-log.php:16`, `tab-config.php:64` | `WP_DEBUG_LOG` `'true'`/`'1'` trattato come percorso di file (il core lo intende come `wp-content/debug.log`); `ini error_log` ignorato | U |
 | 8 ✅ | B | `class-admin.php:98` | Ogni salvataggio scrive tutte e 5 le costanti; su un sito pulito `WP_DEBUG_DISPLAY` risulta già spuntato (default del core) e finisce scritto `true`: errori visibili ai visitatori | E |
 | 9 ✅ | C | `class-standalone-config.php`, `class-config.php:142` | CRLF convertiti in LF sulla riga modificata; nome costante case-insensitive; `addslashes` in una stringa a virgolette singole | U |
 
@@ -78,7 +78,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 23 ✅ | B | `class-standalone-config.php:68` | Backslash nelle password alterati (`stripslashes`); valori con `);` troncati | U |
 | 24 ✅ | B | `class-standalone-config.php:231` | `DB_HOST` con socket o IPv6 interpretato male | U |
 | 25 ✅ | B | `class-standalone-config.php:19` | `wp-config.php` sopra la root di WordPress o plugin in symlink: non trovato | U |
-| 26 | B | `emergency.php:301` | Multisite ignorato: plugin attivi in rete, temi e transient degli altri siti | I (multisite) + E |
+| 26 ✅ | B | `emergency.php:301` | Multisite ignorato: plugin attivi in rete, temi e transient degli altri siti | I (multisite) + E |
 | 27 ✅ | B | — | Con object cache persistente (Redis/Memcached) le azioni scrivono nel DB ma il sito continua a usare i valori in cache: nessun avviso | U (rilevamento del drop-in) |
 | 28 ✅ | B | `emergency.php:330` | "Cambia a tema default" può scegliere il tema attivo (rotto) o un child theme | I + E |
 | 29 ✅ | B | `emergency.php:138,155` | Il blocco conta dal primo errore, non dal quinto: finestra più corta del dichiarato | U (orologio iniettabile) |
@@ -102,26 +102,22 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 42 ✅ | A | `class-snapshots.php:206` | Un nome di plugin con UTF-8 non valido fa fallire `json_encode` e la scrittura **cancella tutti gli snapshot** | U |
 | 43 | B | `admin.js:20-42` | "Aggiorna" e auto-refresh del log mostrano sempre il contenuto di quando la pagina è stata caricata (verificato) | E |
 | 44 | B | `tab-log.php:65`, `tab-queries.php:67` | Un byte UTF-8 non valido rende vuoto il viewer | E |
-| 45 | B | `class-snapshots.php:48-64,154` | Gli snapshot automatici (uno per aggiornamento, dopo l'aggiornamento) espellono quelli manuali dai 5 posti; deduplica che ignora temi e core | I |
-| 46 ½ | B | `class-snapshots.php:313,328` | Ripristino con `update_option` invece di `switch_theme()`/attivazione: niente hook, tema padre non verificato, `autoload` portato a `false` su `active_plugins`, `stylesheet`, `template` | I |
-| 47 | B | `class-snapshots.php:115` | Multisite: plugin attivi in rete ignorati in cattura, diff e ripristino | I (multisite) |
+| 45 ✅ | B | `class-snapshots.php:48-64,154` | Gli snapshot automatici (uno per aggiornamento, dopo l'aggiornamento) espellono quelli manuali dai 5 posti; deduplica che ignora temi e core | I |
+| 46 ✅ | B | `class-snapshots.php:313,328` | Ripristino con `update_option` invece di `switch_theme()`/attivazione: niente hook, tema padre non verificato, `autoload` portato a `false` su `active_plugins`, `stylesheet`, `template` | I |
+| 47 ✅ | B | `class-snapshots.php:115` | Multisite: plugin attivi in rete ignorati in cattura, diff e ripristino | I (multisite) |
 | 48 | B | `class-admin.php:303,278` | "Ripristino completato" ed "eliminato" mostrati anche in caso di errore | E |
-| 49 | B | `class-queries.php:31-64` | Il monitor salva fino a 500 query complete a ogni richiesta pubblica (login, REST, checkout, WP-CLI): email, indirizzi, token di sessione nel database e nei backup; una scrittura pesante per richiesta | I |
+| 49 ✅ | B | `class-queries.php:31-64` | Il monitor salva fino a 500 query complete a ogni richiesta pubblica (login, REST, checkout, WP-CLI): email, indirizzi, token di sessione nel database e nei backup; una scrittura pesante per richiesta | I |
 | 50 ✅ | B | `db-debug-manager.php` | Manca `Update URI`: lo slug può ricevere "aggiornamenti" da un plugin omonimo su wordpress.org; `DISALLOW_FILE_MODS` non rispettato per `wp-config.php` | U |
-| 51 | C | — | Nessuna disinstallazione: restano opzioni, transient, cartella privata e le costanti scritte in `wp-config.php` | I |
+| 51 ✅ | C | — | Nessuna disinstallazione: restano opzioni, transient, cartella privata e le costanti scritte in `wp-config.php` | I |
 | 52 ✅ | C | `class-log.php:57` | Lettura della coda del log quadratica, memoria illimitata su righe lunghissime; `tail()` restituisce N+1 righe | U |
 | 53 | C | `class-admin.php:165` | Download del log: buffer non svuotati, `Content-Length` che cambia, niente `nosniff` | E |
 | 54 | C | `page.php:24-65` | Messaggi `err` dalla query string mostrati in admin (contenuto arbitrario via link) | E |
-| 55 | C | `class-emergency.php:111` | Cartella privata `0755`, file `0644` (backup con credenziali leggibile da altri utenti su hosting condiviso); token creato due volte in caso di richieste concorrenti; cartella creata da root con WP-CLI | I |
-| 56 | C | `class-snapshots.php:86` | Lettura e scrittura degli snapshot senza lock tra pannello ed emergency | I |
+| 55 ✅ | C | `class-emergency.php:111` | Cartella privata `0755`, file `0644` (backup con credenziali leggibile da altri utenti su hosting condiviso); token creato due volte in caso di richieste concorrenti; cartella creata da root con WP-CLI | I |
+| 56 ✅ | C | `class-snapshots.php:86` | Lettura e scrittura degli snapshot senza lock tra pannello ed emergency | I |
 | 57 | C | `admin.js` | Senza `debug.log` al caricamento il viewer non esiste e l'auto-refresh non fa nulla; nessun `.fail()` (nonce scaduto) | E |
 | 58 | C | template | i18n assente (`load_plugin_textdomain`, `Domain Path`); stringhe non traducibili; percorso del backup indicato in modo errato | — |
 | 59 | C | template | Accessibilità: checkbox delle costanti senza etichetta, filtri con solo placeholder, pulsante 🗑 senza nome, `#999` su bianco (2,8:1) | E (axe) |
 | 60 ✅ | B | `tab-emergency.php:23` | La regola Nginx suggerita protegge ancora `plugins/db-debug-manager/private`: dalla 1.4.0 la cartella privata è `wp-content/dbdm-private-*` (trovato nella Fase 1) | E |
-
-Fase 1: 7 in parte (stato nel pannello corretto; il percorso effettivo da
-`ini_get('error_log')` richiede costanti definite davvero: integration della
-Fase 2).
 
 Legenda (aggiornata alla Fase A, 2026-10-06): ✅ corretto con test · ½ in
 parte (33: `csrf`/`password` come array gestiti, il resto in 2.0.0; 46:
@@ -227,16 +223,21 @@ rilevamento object cache (27), `Update URI`/`DISALLOW_FILE_MODS` (50).
 
 WordPress + MySQL reali, anche multisite:
 
-- [ ] salvataggio costanti end-to-end e valore effettivo in un processo
-      separato; backup = stato precedente;
-- [ ] aggiornamento reale del plugin con `Plugin_Upgrader` da ZIP locale:
+- [x] salvataggio costanti end-to-end e valore effettivo in un processo
+      separato; backup = stato precedente (coperto dagli E2E della Fase A);
+- [x] aggiornamento reale del plugin con `Plugin_Upgrader` da ZIP locale:
       snapshot e backup sopravvivono (bug 39);
-- [ ] snapshot: limiti per tipo, cattura prima dell'aggiornamento, diff,
+- [x] snapshot: limiti per tipo, cattura prima dell'aggiornamento, diff,
       ripristino via API del core, autoload, multisite (45–47, 17);
-- [ ] capability in multisite (40);
-- [ ] monitor query: niente dati dei visitatori (49);
-- [ ] disattivazione e disinstallazione (14, 51);
-- [ ] permessi e concorrenza della cartella privata (55, 56).
+- [x] capability in multisite (40, Fase A);
+- [x] monitor query: niente dati dei visitatori (49);
+- [x] disattivazione e disinstallazione (14, 51);
+- [x] permessi e concorrenza della cartella privata (55, 56).
+
+Fatto (2026-10-06): bug 7 (resto), 26, 45, 46, 47, 49, 51, 55, 56; unit
+199, integration in `Phase2IntegrationTest`. L'integration ha trovato che
+`add_option()` non è atomico (sovrascrive con ON DUPLICATE KEY UPDATE): il
+token usa INSERT IGNORE.
 
 ## 6. Fase 3 — E2E "al massimo" (stima 120+)
 

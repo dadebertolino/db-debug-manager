@@ -2,15 +2,22 @@
 /**
  * DB Debug Manager — Query monitor
  * Cattura l'elenco query da $wpdb->queries (richiede SAVEQUERIES=true).
- * Le query dell'admin UI stessa vengono escluse dal report.
+ *
+ * 2.0.0 (bug 49): solo le pagine dell'amministratore che ha attivato il
+ * monitor (per MONITOR_DURATION), mai login, REST, AJAX, cron e WP-CLI.
+ * Prima ogni richiesta pubblica salvava fino a 500 query complete: email,
+ * indirizzi e token dei visitatori nel database e nei backup.
  */
 
 if (!defined('ABSPATH')) exit;
 
 class DBDM_Queries {
 
+    /** User meta: fino a quando il monitor è attivo per quell'utente. */
+    const META_UNTIL = 'dbdm_query_monitor_until';
+    const MONITOR_DURATION = 1800;
+
     private static $instance = null;
-    private $snapshot = null;
 
     public static function instance() {
         if (null === self::$instance) {
@@ -20,23 +27,43 @@ class DBDM_Queries {
     }
 
     private function __construct() {
-        // Salva uno snapshot in chiusura di una pagina frontend (non admin).
-        // L'admin di solito genera molte query irrilevanti per il monitor.
         add_action('shutdown', array($this, 'capture_snapshot'), 999);
+    }
+
+    public static function start($user_id) {
+        update_user_meta((int) $user_id, self::META_UNTIL, time() + self::MONITOR_DURATION);
+    }
+
+    public static function stop($user_id) {
+        delete_user_meta((int) $user_id, self::META_UNTIL);
+    }
+
+    /**
+     * Secondi di monitor rimasti per l'utente (0 se spento o scaduto).
+     */
+    public static function remaining($user_id) {
+        $until = (int) get_user_meta((int) $user_id, self::META_UNTIL, true);
+        return max(0, $until - time());
+    }
+
+    /**
+     * La richiesta corrente va registrata?
+     */
+    public static function should_capture() {
+        if (is_admin() || wp_doing_ajax() || wp_doing_cron()) return false;
+        if (defined('REST_REQUEST') && REST_REQUEST) return false;
+        if (defined('WP_CLI') && WP_CLI) return false;
+        if (isset($GLOBALS['pagenow']) && $GLOBALS['pagenow'] === 'wp-login.php') return false;
+        if (!is_user_logged_in() || !current_user_can(DBDM_Admin::cap())) return false;
+        return self::remaining(get_current_user_id()) > 0;
     }
 
     /**
      * Salva snapshot in transient per visualizzazione in admin.
      */
     public function capture_snapshot() {
-        if (is_admin() || wp_doing_ajax() || wp_doing_cron()) {
-            return;
-        }
-        if (!defined('SAVEQUERIES') || !SAVEQUERIES) {
-            return;
-        }
         global $wpdb;
-        if (empty($wpdb->queries)) {
+        if (empty($wpdb->queries) || !self::should_capture()) {
             return;
         }
 

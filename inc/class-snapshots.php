@@ -3,9 +3,11 @@
  * DB Debug Manager — Preflight Snapshots
  *
  * Cattura lo stato del sito (plugin attivi + tema + versioni) e consente rollback.
- * Trigger: manuale, attivazione emergency, completamento upgrade WP.
+ * Trigger: manuale, attivazione emergency, prima di aggiornare plugin e temi,
+ * dopo un aggiornamento del core.
  *
- * Storage: snapshots.json nella cartella privata randomizzata, FIFO, max MAX_SNAPSHOTS.
+ * Storage: snapshots.json nella cartella privata randomizzata. 2.0.0: posti
+ * separati per manuali e automatici (MAX_SNAPSHOTS ciascuno).
  */
 
 if (!defined('ABSPATH')) exit;
@@ -13,17 +15,55 @@ if (!defined('ABSPATH')) exit;
 class DBDM_Snapshots {
 
     const MAX_SNAPSHOTS = 5;
-    const TRIGGER_MANUAL    = 'manual';
-    const TRIGGER_EMERGENCY = 'emergency_enabled';
-    const TRIGGER_UPGRADE   = 'wp_upgrade';
+    const TRIGGER_MANUAL      = 'manual';
+    const TRIGGER_EMERGENCY   = 'emergency_enabled';
+    /** Dopo l'aggiornamento del core (fino alla 1.4.0 anche plugin e temi). */
+    const TRIGGER_UPGRADE     = 'wp_upgrade';
+    /** Prima di aggiornare o installare plugin e temi (2.0.0). */
+    const TRIGGER_PRE_UPGRADE = 'pre_upgrade';
+
+    /** @var bool Snapshot "prima dell'aggiornamento" già fatto in questa richiesta. */
+    private static $pre_upgrade_done = false;
 
     public static function init() {
         // Snapshot quando viene attivato l'emergency.
         add_action('update_option_' . DBDM_Emergency::OPTION_ENABLED, array(__CLASS__, 'on_emergency_toggle'), 10, 2);
         add_action('add_option_' . DBDM_Emergency::OPTION_ENABLED, array(__CLASS__, 'on_emergency_add'), 10, 2);
 
-        // Snapshot dopo un update completato (core/plugin/theme).
+        // 2.0.0 (bug 45): plugin e temi prima dell'installazione (lo stato
+        // da ripristinare è quello precedente), il core dopo (non ha un hook
+        // prima dell'installazione).
+        add_filter('upgrader_pre_install', array(__CLASS__, 'on_pre_install'), 10, 2);
         add_action('upgrader_process_complete', array(__CLASS__, 'on_upgrade_complete'), 10, 2);
+    }
+
+    /**
+     * Filtro upgrader_pre_install: snapshot prima di sostituire i file di
+     * un plugin o di un tema. Uno solo per richiesta: un aggiornamento in
+     * blocco non occupa tutti i posti.
+     *
+     * @param bool|WP_Error $return
+     * @param array         $hook_extra
+     * @return bool|WP_Error Invariato.
+     */
+    public static function on_pre_install($return, $hook_extra) {
+        if (is_wp_error($return) || self::$pre_upgrade_done) return $return;
+        $hook_extra = is_array($hook_extra) ? $hook_extra : array();
+
+        if (!empty($hook_extra['plugin'])) {
+            $note = sprintf(__('Prima dell\'aggiornamento del plugin %s', 'db-debug-manager'), $hook_extra['plugin']);
+        } elseif (!empty($hook_extra['theme'])) {
+            $note = sprintf(__('Prima dell\'aggiornamento del tema %s', 'db-debug-manager'), $hook_extra['theme']);
+        } elseif (isset($hook_extra['type']) && in_array($hook_extra['type'], array('plugin', 'theme'), true)) {
+            $note = $hook_extra['type'] === 'plugin'
+                ? __('Prima dell\'installazione di un plugin', 'db-debug-manager')
+                : __('Prima dell\'installazione di un tema', 'db-debug-manager');
+        } else {
+            return $return;
+        }
+        self::$pre_upgrade_done = true;
+        self::create(self::TRIGGER_PRE_UPGRADE, $note);
+        return $return;
     }
 
     /**
@@ -49,18 +89,10 @@ class DBDM_Snapshots {
         $type = isset($hook_extra['type']) ? $hook_extra['type'] : '';
         $action = isset($hook_extra['action']) ? $hook_extra['action'] : '';
 
-        if ($action !== 'update' && $action !== 'install') return;
-        if (!in_array($type, array('plugin', 'theme', 'core'), true)) return;
+        // Plugin e temi: già catturati prima (on_pre_install).
+        if ($action !== 'update' || $type !== 'core') return;
 
-        $note = sprintf(__('Dopo %1$s %2$s', 'db-debug-manager'), $action, $type);
-
-        if ($type === 'plugin' && !empty($hook_extra['plugins'])) {
-            $note .= ': ' . implode(', ', array_slice((array) $hook_extra['plugins'], 0, 3));
-        } elseif ($type === 'theme' && !empty($hook_extra['themes'])) {
-            $note .= ': ' . implode(', ', array_slice((array) $hook_extra['themes'], 0, 3));
-        }
-
-        self::create(self::TRIGGER_UPGRADE, $note);
+        self::create(self::TRIGGER_UPGRADE, sprintf(__('Dopo l\'aggiornamento di WordPress a %s', 'db-debug-manager'), get_bloginfo('version')));
     }
 
     /**
@@ -83,29 +115,65 @@ class DBDM_Snapshots {
         $snapshot['timestamp'] = time();
         $snapshot['created_by'] = get_current_user_id();
 
-        $all = self::get_all();
+        return self::mutate(function ($all) use ($snapshot, $trigger) {
+            // Dedup: se l'ultimo snapshot ha stato identico (e stesso trigger entro 60s), skippa.
+            if (!empty($all)) {
+                $last = $all[count($all) - 1];
+                if ($last['trigger'] === $trigger
+                    && (time() - $last['timestamp']) < 60
+                    && self::states_equal($last, $snapshot)) {
+                    return array(null, $last['id']);
+                }
+            }
+            $all[] = $snapshot;
+            return array(self::prune($all), $snapshot['id']);
+        });
+    }
 
-        // Dedup: se l'ultimo snapshot ha stato identico (e stesso trigger entro 60s), skippa.
-        if (!empty($all)) {
-            $last = $all[count($all) - 1];
-            if ($last['trigger'] === $trigger
-                && (time() - $last['timestamp']) < 60
-                && self::states_equal($last, $snapshot)) {
-                return $last['id'];
+    /**
+     * Legge, trasforma e riscrive snapshots.json sotto lock esclusivo.
+     * 2.0.0 (bug 56): due richieste insieme (snapshot manuale e
+     * aggiornamento) non perdono più uno snapshot.
+     *
+     * @param callable $fn function(array $all): array{0:array|null,1:mixed};
+     *                     null come elenco = nulla da scrivere.
+     * @return mixed Il secondo valore di $fn, WP_Error se la scrittura fallisce.
+     */
+    private static function mutate($fn) {
+        $lock = @fopen(DBDM_Emergency::private_dir() . 'snapshots.lock', 'c');
+        if ($lock) {
+            flock($lock, LOCK_EX);
+        }
+        try {
+            list($all, $result) = $fn(self::get_all());
+            if ($all !== null && !self::write_all($all)) {
+                $result = new WP_Error('dbdm_snap_write_fail', __('Impossibile scrivere file snapshot.', 'db-debug-manager'));
+            }
+        } finally {
+            if ($lock) {
+                flock($lock, LOCK_UN);
+                fclose($lock);
             }
         }
+        return $result;
+    }
 
-        $all[] = $snapshot;
-
-        // FIFO: tieni solo gli ultimi MAX_SNAPSHOTS.
-        if (count($all) > self::MAX_SNAPSHOTS) {
-            $all = array_slice($all, -self::MAX_SNAPSHOTS);
+    /**
+     * Tiene gli ultimi MAX_SNAPSHOTS manuali e gli ultimi MAX_SNAPSHOTS
+     * automatici, nell'ordine originale. 2.0.0 (bug 45): prima un unico
+     * gruppo da 5, e gli automatici espellevano i manuali.
+     */
+    private static function prune(array $all) {
+        $left = array('manual' => self::MAX_SNAPSHOTS, 'auto' => self::MAX_SNAPSHOTS);
+        $keep = array();
+        for ($i = count($all) - 1; $i >= 0; $i--) {
+            $group = isset($all[$i]['trigger']) && $all[$i]['trigger'] === self::TRIGGER_MANUAL ? 'manual' : 'auto';
+            if ($left[$group] > 0) {
+                $left[$group]--;
+                $keep[] = $all[$i];
+            }
         }
-
-        if (!self::write_all($all)) {
-            return new WP_Error('dbdm_snap_write_fail', __('Impossibile scrivere file snapshot.', 'db-debug-manager'));
-        }
-        return $snapshot['id'];
+        return array_reverse($keep);
     }
 
     /**
@@ -140,6 +208,8 @@ class DBDM_Snapshots {
 
         return array(
             'active_plugins'  => $active_plugins,
+            // 2.0.0 (bug 47): plugin attivi in rete.
+            'network_plugins' => is_multisite() ? array_keys((array) get_site_option('active_sitewide_plugins', array())) : array(),
             'stylesheet'      => $stylesheet,
             'template'        => $template,
             'plugin_versions' => $plugin_versions,
@@ -149,10 +219,12 @@ class DBDM_Snapshots {
     }
 
     /**
-     * Due snapshot hanno stesso stato "sensibile" (plugin attivi + tema + versioni)?
+     * Due snapshot hanno stesso stato "sensibile" (plugin attivi + tema +
+     * versioni di plugin, temi e core)? 2.0.0 (bug 45): prima temi e core
+     * erano ignorati.
      */
     private static function states_equal($a, $b) {
-        $fields = array('active_plugins', 'stylesheet', 'template');
+        $fields = array('active_plugins', 'network_plugins', 'stylesheet', 'template');
         foreach ($fields as $f) {
             $va = isset($a[$f]) ? $a[$f] : null;
             $vb = isset($b[$f]) ? $b[$f] : null;
@@ -160,14 +232,21 @@ class DBDM_Snapshots {
             if (is_array($vb)) sort($vb);
             if ($va !== $vb) return false;
         }
-        // Confronta solo versioni dei plugin (ignora nomi).
-        $va = array();
-        foreach (($a['plugin_versions'] ?? array()) as $k => $v) $va[$k] = $v['version'] ?? '';
-        $vb = array();
-        foreach (($b['plugin_versions'] ?? array()) as $k => $v) $vb[$k] = $v['version'] ?? '';
-        ksort($va);
-ksort($vb);
-        return $va === $vb;
+        if (($a['wp_version'] ?? '') !== ($b['wp_version'] ?? '')) return false;
+        // Versioni di plugin e temi (i nomi non contano).
+        foreach (array('plugin_versions', 'theme_versions') as $f) {
+            if (self::versions($a[$f] ?? array()) !== self::versions($b[$f] ?? array())) return false;
+        }
+        return true;
+    }
+
+    private static function versions($list) {
+        $out = array();
+        foreach ((array) $list as $k => $v) {
+            $out[$k] = is_array($v) && isset($v['version']) ? (string) $v['version'] : '';
+        }
+        ksort($out);
+        return $out;
     }
 
     /**
@@ -190,15 +269,18 @@ ksort($vb);
     }
 
     public static function delete($id) {
-        $all = self::get_all();
-        $filtered = array_values(array_filter($all, function ($s) use ($id) {
- return $s['id'] !== $id;
-}));
-        return self::write_all($filtered);
+        return self::mutate(function ($all) use ($id) {
+            $filtered = array_values(array_filter($all, function ($s) use ($id) {
+                return !isset($s['id']) || $s['id'] !== $id;
+            }));
+            return array($filtered, true);
+        }) === true;
     }
 
     public static function delete_all() {
-        return self::write_all(array());
+        return self::mutate(function () {
+            return array(array(), true);
+        }) === true;
     }
 
     /**
@@ -241,6 +323,9 @@ ksort($vb);
 
         $activated   = array_values(array_diff($b_active, $a_active));
         $deactivated = array_values(array_diff($a_active, $b_active));
+
+        $a_network = (array) ($a['network_plugins'] ?? array());
+        $b_network = (array) ($b['network_plugins'] ?? array());
 
         $a_versions = $a['plugin_versions'] ?? array();
         $b_versions = $b['plugin_versions'] ?? array();
@@ -285,6 +370,8 @@ ksort($vb);
         return array(
             'plugins_activated'   => $activated,
             'plugins_deactivated' => $deactivated,
+            'network_activated'   => array_values(array_diff($b_network, $a_network)),
+            'network_deactivated' => array_values(array_diff($a_network, $b_network)),
             'plugins_updated'     => $updated,
             'plugins_installed'   => $installed,
             'plugins_removed'     => $removed,
@@ -296,11 +383,53 @@ ksort($vb);
     public static function diff_is_empty($d) {
         return empty($d['plugins_activated'])
             && empty($d['plugins_deactivated'])
+            && empty($d['network_activated'])
+            && empty($d['network_deactivated'])
             && empty($d['plugins_updated'])
             && empty($d['plugins_installed'])
             && empty($d['plugins_removed'])
             && empty($d['theme_changed'])
             && empty($d['wp_version_changed']);
+    }
+
+    /**
+     * Porta i plugin attivi (del sito o della rete) a quelli dello snapshot
+     * con le funzioni del core. 2.0.0 (bug 46, 47): prima l'opzione veniva
+     * scritta direttamente, senza hook di attivazione e disattivazione e
+     * senza i plugin attivi in rete. Il Debug Manager non viene mai
+     * disattivato da un ripristino.
+     *
+     * @return array[] Messaggi.
+     */
+    private static function restore_plugin_set($wanted, array $current, array $installed, $network) {
+        $wanted  = array_values(array_filter((array) $wanted, 'is_string'));
+        $valid   = array_values(array_intersect($wanted, $installed));
+        $missing = array_values(array_diff($wanted, $installed));
+        $self    = plugin_basename(DBDM_PLUGIN_FILE);
+
+        $off = array_values(array_diff($current, $valid, array($self)));
+        if ($off) {
+            deactivate_plugins($off, false, $network);
+        }
+        $failed = array();
+        foreach (array_diff($valid, $current) as $plugin) {
+            $result = activate_plugin($plugin, '', $network);
+            if (is_wp_error($result)) {
+                $failed[] = $plugin . ' (' . $result->get_error_message() . ')';
+            }
+        }
+
+        $label = $network
+            ? __('Plugin attivi in rete ripristinati: %d.', 'db-debug-manager')
+            : __('Plugin attivi ripristinati: %d.', 'db-debug-manager');
+        $messages = array(array('ok', sprintf($label, count($valid) - count($failed))));
+        if ($missing) {
+            $messages[] = array('warn', sprintf(__('Non ripristinati (non più installati): %s', 'db-debug-manager'), implode(', ', $missing)));
+        }
+        if ($failed) {
+            $messages[] = array('err', sprintf(__('Attivazione non riuscita: %s', 'db-debug-manager'), implode(', ', $failed)));
+        }
+        return $messages;
     }
 
     /**
@@ -315,22 +444,23 @@ ksort($vb);
         $messages = array();
 
         if (in_array('plugins', $parts, true)) {
-            // Filtra solo plugin che esistono ancora sul filesystem (evita fatal su plugin rimossi).
-            $existing = array_keys($snap['plugin_versions'] ?? array());
-            $current_installed = function_exists('get_plugins') ? array_keys(get_plugins()) : $existing;
-            $to_activate = array_values(array_intersect($snap['active_plugins'] ?? array(), $current_installed));
-
-            update_option('active_plugins', $to_activate);
-            $messages[] = array('ok', sprintf(
-                __('Plugin attivi ripristinati: %d.', 'db-debug-manager'),
-                count($to_activate)
+            if (!function_exists('activate_plugin')) {
+                require_once ABSPATH . 'wp-admin/includes/plugin.php';
+            }
+            $installed = array_keys(get_plugins());
+            $messages  = array_merge($messages, self::restore_plugin_set(
+                $snap['active_plugins'] ?? array(),
+                (array) get_option('active_plugins', array()),
+                $installed,
+                false
             ));
-
-            $missing = array_diff($snap['active_plugins'] ?? array(), $current_installed);
-            if (!empty($missing)) {
-                $messages[] = array('warn', sprintf(
-                    __('Non ripristinati (non più installati): %s', 'db-debug-manager'),
-                    implode(', ', $missing)
+            // Snapshot precedenti alla 2.0.0 non hanno i plugin di rete.
+            if (is_multisite() && isset($snap['network_plugins'])) {
+                $messages = array_merge($messages, self::restore_plugin_set(
+                    $snap['network_plugins'],
+                    array_keys((array) get_site_option('active_sitewide_plugins', array())),
+                    $installed,
+                    true
                 ));
             }
         }

@@ -161,6 +161,12 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Fix: il viewer del log segue il file in cui PHP scrive davvero** (l'`error_log` impostato da WordPress); `WP_DEBUG_LOG` a `'0'` non è più scambiato per un file.
+- **Emergency in multisite:** mostra e disattiva anche i plugin attivi in rete (la causa più comune di una rete ferma); "Disattiva tutti" e "Svuota transient" valgono anche per la rete. Tema e opzioni restano quelli del sito principale.
+- **Snapshot:** quelli automatici non espellono più quelli manuali (5 posti ciascuno); per plugin e temi lo snapshot automatico è fatto *prima* dell'aggiornamento (uno per richiesta, anche negli aggiornamenti in blocco). Il ripristino attiva e disattiva i plugin come la pagina Plugin (con i loro hook) e, in multisite, riporta anche i plugin attivi in rete. Lettura e scrittura degli snapshot sotto lock.
+- **Privacy (monitor query):** registra solo le pagine dell'amministratore che lo attiva dalla tab Query, per 30 minuti; mai le visite degli altri, il login, REST e AJAX. Prima salvava nel database le query di ogni visitatore.
+- **Disinstallazione:** eliminando il plugin vengono rimossi opzioni, transient, impostazioni utente e la cartella privata (snapshot, backup, log). Le costanti in `wp-config.php` restano: la pagina Plugin e la tab Costanti le elencano prima.
+- **Cartella privata:** nessuna seconda cartella con richieste concorrenti; con WP-CLI lanciato da root file e cartelle restano del proprietario del sito.
 - **Fix: lettura del debug.log lenta e senza limite di memoria** su file grandi o con righe lunghissime, e con una riga in più del richiesto. Ora è lineare, legge al massimo 2 MB e segna con … una riga tagliata.
 - **`Update URI` nell'intestazione del plugin:** WordPress non può più proporre come aggiornamento un plugin omonimo di wordpress.org.
 - **Rispetto di `DISALLOW_FILE_MODS`:** con le modifiche ai file disattivate, né il pannello né l'emergency scrivono `wp-config.php`; il pannello lo spiega.

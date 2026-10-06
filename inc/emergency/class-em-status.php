@@ -179,6 +179,8 @@ class DBDM_Em_Status {
             'log_content'     => self::tail_bytes($log_path, self::DEBUG_LOG_TAIL),
             'log_size'        => file_exists($log_path) ? (int) filesize($log_path) : 0,
             'active_plugins'  => $active === null ? array() : $active,
+            'network_plugins' => (array) $repo->network_plugins(),
+            'multisite'       => $repo->is_network(),
             'cur_theme'       => $repo->get_option('stylesheet', '-'),
             'consts_status'   => self::constants_status(@file_get_contents($config_path)),
             'php_error_log'   => $php_error_log,

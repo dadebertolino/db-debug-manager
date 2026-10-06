@@ -11,6 +11,7 @@ $snapshots = array_reverse($snapshots);
 $trigger_labels = array(
     DBDM_Snapshots::TRIGGER_MANUAL    => array('Manuale', 'primary'),
     DBDM_Snapshots::TRIGGER_EMERGENCY => array('Emergency attivato', 'warning'),
+    DBDM_Snapshots::TRIGGER_PRE_UPGRADE => array('Pre-aggiornamento', 'success'),
     DBDM_Snapshots::TRIGGER_UPGRADE   => array('Post-aggiornamento', 'success'),
 );
 
@@ -149,6 +150,18 @@ return ($d && $d !== '.') ? $d : $p;
 }, $diff['plugins_deactivated'])));
 ?>
 </span>
+                                        </li>
+                                    <?php endif; ?>
+
+                                    <?php if (!empty($diff['network_activated'])): ?>
+                                        <li>🌐 <?php printf(esc_html__('%d plugin attivati in rete dopo lo snapshot', 'db-debug-manager'), count($diff['network_activated'])); ?>:
+                                            <span class="dbdm-plugin-list"><?php echo esc_html(implode(', ', $diff['network_activated'])); ?></span>
+                                        </li>
+                                    <?php endif; ?>
+
+                                    <?php if (!empty($diff['network_deactivated'])): ?>
+                                        <li>🌐 <?php printf(esc_html__('%d plugin disattivati in rete dopo lo snapshot', 'db-debug-manager'), count($diff['network_deactivated'])); ?>:
+                                            <span class="dbdm-plugin-list"><?php echo esc_html(implode(', ', $diff['network_deactivated'])); ?></span>
                                         </li>
                                     <?php endif; ?>
 

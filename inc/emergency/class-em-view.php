@@ -72,6 +72,9 @@ class DBDM_Em_View {
         $php_log_content = $data['php_log_content'];
         $snapshots       = $data['snapshots'];
         $object_cache    = !empty($data['object_cache']);
+        $network_plugins = isset($data['network_plugins']) ? (array) $data['network_plugins'] : array();
+        $multisite       = !empty($data['multisite']);
+        $all_plugins     = array_merge($network_plugins, $active_plugins);
         $this->header('Debug Manager — Emergency Dashboard');
         ?>
 <div class="wrap">
@@ -174,6 +177,7 @@ class DBDM_Em_View {
                 'manual'            => array('Manuale', 'var(--primary)'),
                 'emergency_enabled' => array('Pre-emergency', 'var(--warn)'),
                 'wp_upgrade'        => array('Post-aggiornamento', 'var(--ok)'),
+                'pre_upgrade'       => array('Pre-aggiornamento', 'var(--ok)'),
             );
             $trig = $trigger_map[$snap['trigger'] ?? 'manual'] ?? array($snap['trigger'] ?? '—', 'var(--muted)');
             $date_fmt = !empty($snap['timestamp']) ? gmdate('j/m/Y H:i', $snap['timestamp']) . ' UTC' : '—';
@@ -218,16 +222,19 @@ class DBDM_Em_View {
     <?php endif; ?>
 
     <div class="panel">
-        <h2>🔌 Plugin attivi (<?php echo count($active_plugins); ?>)</h2>
-        <?php if (empty($active_plugins)): ?>
+        <h2>🔌 Plugin attivi (<?php echo count($all_plugins); ?>)</h2>
+        <?php if ($multisite): ?>
+            <p style="color:var(--muted); font-size:12px; margin:0 0 12px;">Multisite: plugin attivi in rete e del sito principale; tema e altre azioni riguardano il sito principale.</p>
+        <?php endif; ?>
+        <?php if (empty($all_plugins)): ?>
             <p style="color:var(--muted);">Nessun plugin attivo.</p>
         <?php else: ?>
             <table>
                 <thead><tr><th>Slug</th><th style="width:100px; text-align:right;">Azione</th></tr></thead>
                 <tbody>
-                    <?php foreach ($active_plugins as $p): ?>
+                    <?php foreach ($all_plugins as $p): ?>
                         <tr>
-                            <td><code><?php echo htmlspecialchars($p, ENT_QUOTES | ENT_SUBSTITUTE); ?></code></td>
+                            <td><code><?php echo htmlspecialchars($p, ENT_QUOTES | ENT_SUBSTITUTE); ?></code><?php if (in_array($p, $network_plugins, true)): ?> <span class="tag tag-warn">rete</span><?php endif; ?></td>
                             <td style="text-align:right;">
                                 <form method="post" style="display:inline;" onsubmit="return confirm(<?php echo $this->js_string('Disattivare ' . $p . '?'); ?>);">
                                     <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES | ENT_SUBSTITUTE); ?>">

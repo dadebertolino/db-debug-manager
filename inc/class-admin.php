@@ -47,6 +47,8 @@ class DBDM_Admin {
         add_action('admin_post_dbdm_delete_snapshot', array($this, 'handle_delete_snapshot'));
         add_action('admin_post_dbdm_restore_snapshot', array($this, 'handle_restore_snapshot'));
         add_action('admin_post_dbdm_clear_snapshots', array($this, 'handle_clear_snapshots'));
+        add_action('admin_post_dbdm_query_monitor', array($this, 'handle_query_monitor'));
+        add_filter('plugin_row_meta', array($this, 'plugin_row_meta'), 10, 2);
         add_action('wp_ajax_dbdm_refresh_log', array($this, 'ajax_refresh_log'));
     }
 
@@ -356,5 +358,37 @@ class DBDM_Admin {
             'tab' => 'snapshots', 'snap_cleared' => '1',
         )));
         exit;
+    }
+
+    /**
+     * Attiva o spegne il monitor delle query per l'utente corrente (2.0.0).
+     */
+    public function handle_query_monitor() {
+        if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
+        check_admin_referer('dbdm_query_monitor');
+
+        if (!empty($_POST['start'])) {
+            DBDM_Queries::start(get_current_user_id());
+        } else {
+            DBDM_Queries::stop(get_current_user_id());
+        }
+        wp_safe_redirect(self::page_url(array('tab' => 'queries')));
+        exit;
+    }
+
+    /**
+     * Pagina Plugin (2.0.0, bug 51): le costanti di debug in wp-config.php
+     * restano dopo la disinstallazione, quindi vengono elencate.
+     */
+    public function plugin_row_meta($meta, $file) {
+        if ($file !== DBDM_Uninstall::BASENAME || !current_user_can(self::cap())) return $meta;
+        $left = DBDM_Uninstall::leftover_constants(DBDM_Config::get_config_path());
+        if ($left) {
+            $meta[] = esc_html(sprintf(
+                __('Eliminando il plugin restano in wp-config.php: %s', 'db-debug-manager'),
+                implode(', ', $left)
+            ));
+        }
+        return $meta;
     }
 }

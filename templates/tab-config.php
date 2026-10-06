@@ -112,6 +112,12 @@ $const_descriptions = array(
                 </button>
                 <span class="db-ui-text-muted"><?php esc_html_e('Le modifiche hanno effetto al prossimo caricamento pagina (backup automatico di wp-config.php nella cartella privata del plugin).', 'db-debug-manager'); ?></span>
             </div>
+            <?php $dbdm_left = DBDM_Uninstall::leftover_constants($config_path); ?>
+            <?php if ($dbdm_left): ?>
+                <p class="db-ui-text-muted" style="margin:12px 0 0;">
+                    <?php echo esc_html(sprintf(__('Se elimini il plugin, queste costanti restano in wp-config.php: %s. Spegnile qui prima, se non servono più.', 'db-debug-manager'), implode(', ', $dbdm_left))); ?>
+                </p>
+            <?php endif; ?>
         </form>
     </div>
 </div>

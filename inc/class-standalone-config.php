@@ -356,12 +356,17 @@ class DBDM_Standalone_Config {
         if ($mode === null) {
             $mode = file_exists($path) ? (fileperms($path) & 0777) : 0644;
         }
+        // Proprietario da conservare: quello del file, o della cartella.
+        $ref = file_exists($path) ? $path : dirname($path);
+        $uid = @fileowner($ref);
+        $gid = @filegroup($ref);
 
         $tmp = dirname($path) . '/.' . basename($path) . '.dbdm-' . bin2hex(random_bytes(6)) . '.tmp';
         $put = @file_put_contents($tmp, $data, LOCK_EX);
         if ($put === $len) {
             @chmod($tmp, $mode);
             if (@rename($tmp, $path)) {
+                self::restore_owner($path, $uid, $gid);
                 return true;
             }
         }
@@ -393,6 +398,34 @@ class DBDM_Standalone_Config {
         }
         @chmod($path, $mode);
         return true;
+    }
+
+    /**
+     * Proprietario da rimettere a un file appena scritto: solo se il
+     * processo è root (WP-CLI lanciato da root) e il file non appartiene
+     * già a $wanted. 2.0.0 (bug 55): altrimenti il server web non potrebbe
+     * più scriverlo.
+     *
+     * @param int       $euid    Utente effettivo del processo.
+     * @param int|false $current Proprietario attuale.
+     * @param int|false $wanted  Proprietario atteso.
+     * @return int|null
+     */
+    public static function owner_to_restore($euid, $current, $wanted) {
+        if ((int) $euid !== 0 || $wanted === false || $current === $wanted) return null;
+        return (int) $wanted;
+    }
+
+    /**
+     * Rimette proprietario e gruppo a un file o una cartella creati da root.
+     */
+    public static function restore_owner($path, $uid, $gid) {
+        if (!function_exists('posix_geteuid')) return;
+        $euid = posix_geteuid();
+        $u = self::owner_to_restore($euid, @fileowner($path), $uid);
+        if ($u !== null) @chown($path, $u);
+        $g = self::owner_to_restore($euid, @filegroup($path), $gid);
+        if ($g !== null) @chgrp($path, $g);
     }
 
     /**

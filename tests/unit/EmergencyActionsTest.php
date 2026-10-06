@@ -469,6 +469,66 @@ class EmergencyActionsTest extends TestCase {
 		);
 	}
 
+	/* --- Multisite (bug 26) ------------------------------------------------- */
+
+	/**
+	 * Rete con plugin attivi in rete (n/n.php) e transient di rete.
+	 */
+	private function network() {
+		$this->pdo->exec( 'CREATE TABLE wp_sitemeta (meta_id INTEGER PRIMARY KEY, site_id INTEGER, meta_key TEXT, meta_value TEXT)' );
+		$stmt = $this->pdo->prepare( 'INSERT INTO wp_sitemeta (site_id, meta_key, meta_value) VALUES (?, ?, ?)' );
+		$stmt->execute( array( 1, 'active_sitewide_plugins', serialize( array( 'n/n.php' => 111, 'm/m.php' => 222 ) ) ) );
+		$stmt->execute( array( 1, '_site_transient_z', '1' ) );
+		$stmt->execute( array( 1, '_site_transient_timeout_z', '1' ) );
+		$stmt->execute( array( 2, 'active_sitewide_plugins', serialize( array( 'altra/rete.php' => 1 ) ) ) );
+		$this->repo = new DBDM_Em_Repository( $this->pdo, 'wp_', 1 );
+	}
+
+	private function network_raw() {
+		return unserialize( $this->pdo->query( "SELECT meta_value FROM wp_sitemeta WHERE site_id = 1 AND meta_key = 'active_sitewide_plugins'" )->fetchColumn() );
+	}
+
+	public function test_plugin_attivi_in_rete_letti_dalla_rete_giusta(): void {
+		$this->assertNull( $this->repo->network_plugins(), 'sito singolo' );
+		$this->network();
+		$this->assertTrue( $this->repo->is_network() );
+		$this->assertSame( array( 'n/n.php', 'm/m.php' ), $this->repo->network_plugins() );
+	}
+
+	public function test_disattiva_un_plugin_attivo_in_rete(): void {
+		$this->network();
+		$notices = $this->run_action( 'disable_plugin', array( 'plugin' => bin2hex( 'n/n.php' ) ) );
+
+		$this->assertSame( array( array( 'ok', 'Plugin disattivato in rete: n/n.php' ) ), $notices );
+		$this->assertSame( array( 'm/m.php' => 222 ), $this->network_raw(), 'gli altri restano, con la loro data' );
+		$this->assertSame( array( 'a/a.php', 'b/b.php' ), $this->repo->get_option( 'active_plugins' ) );
+	}
+
+	public function test_disattiva_tutti_anche_in_rete(): void {
+		$this->network();
+		$notices = $this->run_action( 'disable_all_plugins' );
+
+		$this->assertSame( array( array( 'ok', 'Tutti i plugin sono stati disattivati (2 attivi in rete).' ) ), $notices );
+		$this->assertSame( array(), $this->network_raw() );
+		$this->assertSame( array(), $this->repo->get_option( 'active_plugins' ) );
+		$this->assertSame( serialize( array( 'altra/rete.php' => 1 ) ), $this->pdo->query( "SELECT meta_value FROM wp_sitemeta WHERE site_id = 2" )->fetchColumn(), 'altre reti intatte' );
+	}
+
+	public function test_transient_di_rete_svuotati(): void {
+		$this->network();
+		$notices = $this->run_action( 'clear_transients' );
+
+		$this->assertSame( array( array( 'ok', '5 transient eliminati.' ) ), $notices );
+		$this->assertSame( '0', (string) $this->pdo->query( "SELECT COUNT(*) FROM wp_sitemeta WHERE meta_key LIKE '%transient%'" )->fetchColumn() );
+	}
+
+	public function test_stato_con_i_plugin_di_rete(): void {
+		$this->network();
+		$data = DBDM_Em_Status::collect( $this->repo, $this->config, $this->content, $this->private );
+		$this->assertTrue( $data['multisite'] );
+		$this->assertSame( array( 'n/n.php', 'm/m.php' ), $data['network_plugins'] );
+	}
+
 	/* --- Smistamento delle azioni (bug 30) --------------------------------- */
 
 	private function handle( array $post, $method = 'POST' ) {

@@ -90,6 +90,17 @@ class DBDM_Em_App {
     }
 
     /**
+     * Rete del multisite secondo wp-config.php (2.0.0, bug 26): MULTISITE
+     * vero e SITE_ID_CURRENT_SITE (1 se manca); null su un sito singolo.
+     */
+    public static function network_site_id($wp_config_content) {
+        $defines = DBDM_Standalone_Config::effective_defines((string) $wp_config_content);
+        if (empty($defines['MULTISITE'])) return null;
+        return isset($defines['SITE_ID_CURRENT_SITE']) && is_numeric($defines['SITE_ID_CURRENT_SITE'])
+            ? (int) $defines['SITE_ID_CURRENT_SITE'] : 1;
+    }
+
+    /**
      * Header di ogni risposta (2.0.0, bug 35): niente framing
      * (clickjacking sulle azioni distruttive), niente indicizzazione, niente
      * cache (pagine con log e dati del sito), niente referrer.
@@ -152,7 +163,7 @@ class DBDM_Em_App {
             self::unavailable($view, 'connessione al database fallita');
             return;
         }
-        $repo = new DBDM_Em_Repository($pdo, $creds['prefix']);
+        $repo = new DBDM_Em_Repository($pdo, $creds['prefix'], self::network_site_id((string) @file_get_contents($config_path)));
 
         // Attivazione.
         $enabled = $repo->get_option('dbdm_emergency_enabled');
