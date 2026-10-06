@@ -13,7 +13,29 @@ class DBDM_Log {
      * Rispetta WP_DEBUG_LOG se è un path esplicito, altrimenti default a wp-content/debug.log.
      */
     public static function get_path() {
-        return self::resolve_path(defined('WP_DEBUG_LOG') ? WP_DEBUG_LOG : null);
+        return self::effective_path(
+            defined('WP_DEBUG') && WP_DEBUG,
+            defined('WP_DEBUG_LOG') ? WP_DEBUG_LOG : null,
+            (string) ini_get('error_log')
+        );
+    }
+
+    /**
+     * File del log come lo usa PHP. Con WP_DEBUG e WP_DEBUG_LOG attivi
+     * wp_debug_mode() imposta ini error_log, che è il file in cui PHP
+     * scrive davvero (2.0.0, bug 7: prima ignorato); altrimenti il percorso
+     * indicato da WP_DEBUG_LOG o quello predefinito, da mostrare nel viewer.
+     *
+     * @param bool   $wp_debug
+     * @param mixed  $wp_debug_log
+     * @param string $ini_error_log
+     * @return string
+     */
+    public static function effective_path($wp_debug, $wp_debug_log, $ini_error_log) {
+        if ($wp_debug && $wp_debug_log && is_string($ini_error_log) && $ini_error_log !== '') {
+            return $ini_error_log;
+        }
+        return self::resolve_path($wp_debug_log);
     }
 
     /**
@@ -24,7 +46,8 @@ class DBDM_Log {
      * @since 1.4.0
      */
     public static function resolve_path($value) {
-        if (is_string($value) && $value !== '' && !in_array(strtolower($value), array('1', 'true'), true)) {
+        // '0' e '' spengono il log come false (2.0.0: '0' era preso per un file).
+        if ($value && is_string($value) && !in_array(strtolower($value), array('1', 'true'), true)) {
             return $value;
         }
         return self::public_path();

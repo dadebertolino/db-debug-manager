@@ -54,7 +54,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 4 ✅ | A | `class-standalone-config.php:101` | Define con commento in coda, `defined() \|\| define()`, `if (!defined) define`, define su più righe, copia commentata prima di quella attiva, define in un file incluso: viene **inserito un duplicato**. Il toggle non ha effetto, l'admin vede "salvate", PHP 8 emette "already defined" a ogni richiesta | U (tabella di varianti, una sola define attiva col valore atteso) + I |
 | 5 ✅ | B | `class-standalone-config.php:115` | Senza il marker "That's all" e con `require` (non `_once`) o indentato, la define finisce dopo `wp-settings.php`: nessun effetto | U |
 | 6 ✅ | B | `tab-config.php:64` | `define('WP_DEBUG', 1)` mostrato come spento; salvando un'altra costante si scrive `false` | U/I |
-| 7 ½ | B | `class-log.php:16`, `tab-config.php:64` | `WP_DEBUG_LOG` `'true'`/`'1'` trattato come percorso di file (il core lo intende come `wp-content/debug.log`); `ini error_log` ignorato | U |
+| 7 ✅ | B | `class-log.php:16`, `tab-config.php:64` | `WP_DEBUG_LOG` `'true'`/`'1'` trattato come percorso di file (il core lo intende come `wp-content/debug.log`); `ini error_log` ignorato | U |
 | 8 ✅ | B | `class-admin.php:98` | Ogni salvataggio scrive tutte e 5 le costanti; su un sito pulito `WP_DEBUG_DISPLAY` risulta già spuntato (default del core) e finisce scritto `true`: errori visibili ai visitatori | E |
 | 9 ✅ | C | `class-standalone-config.php`, `class-config.php:142` | CRLF convertiti in LF sulla riga modificata; nome costante case-insensitive; `addslashes` in una stringa a virgolette singole | U |
 
@@ -118,10 +118,6 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 58 | C | template | i18n assente (`load_plugin_textdomain`, `Domain Path`); stringhe non traducibili; percorso del backup indicato in modo errato | — |
 | 59 | C | template | Accessibilità: checkbox delle costanti senza etichetta, filtri con solo placeholder, pulsante 🗑 senza nome, `#999` su bianco (2,8:1) | E (axe) |
 | 60 ✅ | B | `tab-emergency.php:23` | La regola Nginx suggerita protegge ancora `plugins/db-debug-manager/private`: dalla 1.4.0 la cartella privata è `wp-content/dbdm-private-*` (trovato nella Fase 1) | E |
-
-Fase 1: 7 in parte (stato nel pannello corretto; il percorso effettivo da
-`ini_get('error_log')` richiede costanti definite davvero: integration della
-Fase 2).
 
 Legenda (aggiornata alla Fase A, 2026-10-06): ✅ corretto con test · ½ in
 parte (33: `csrf`/`password` come array gestiti, il resto in 2.0.0; 46:

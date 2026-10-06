@@ -143,4 +143,27 @@ class ConfigAndLogTest extends TestCase {
 		$this->assertStringNotContainsString( 'prima', $tail );
 		unlink( $file );
 	}
+
+	/**
+	 * Bug 7 (resto): il file del log come lo usa PHP. Con WP_DEBUG e
+	 * WP_DEBUG_LOG attivi WordPress imposta ini error_log, che vince; senza
+	 * WP_DEBUG nessun log (resta il percorso predefinito per il viewer).
+	 *
+	 * @dataProvider percorsi_effettivi
+	 */
+	public function test_percorso_effettivo_del_log( $debug, $log, $ini, $expected ): void {
+		$public = WP_CONTENT_DIR . '/debug.log';
+		$this->assertSame( str_replace( '{public}', $public, $expected ), DBDM_Log::effective_path( $debug, $log, $ini ) );
+	}
+
+	public function percorsi_effettivi() {
+		return array(
+			'log in wp-content'         => array( true, true, '', '{public}' ),
+			'ini impostato da WP'       => array( true, true, '/srv/php/errori.log', '/srv/php/errori.log' ),
+			'percorso personalizzato'   => array( true, '/srv/log/wp.log', '', '/srv/log/wp.log' ),
+			'senza WP_DEBUG ini ignorato' => array( false, true, '/var/log/php-server.log', '{public}' ),
+			'log spento ini ignorato'   => array( true, false, '/var/log/php-server.log', '{public}' ),
+			'log 0 stringa'             => array( true, '0', '/var/log/php-server.log', '{public}' ),
+		);
+	}
 }
