@@ -78,7 +78,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 23 ✅ | B | `class-standalone-config.php:68` | Backslash nelle password alterati (`stripslashes`); valori con `);` troncati | U |
 | 24 ✅ | B | `class-standalone-config.php:231` | `DB_HOST` con socket o IPv6 interpretato male | U |
 | 25 ✅ | B | `class-standalone-config.php:19` | `wp-config.php` sopra la root di WordPress o plugin in symlink: non trovato | U |
-| 26 | B | `emergency.php:301` | Multisite ignorato: plugin attivi in rete, temi e transient degli altri siti | I (multisite) + E |
+| 26 ✅ | B | `emergency.php:301` | Multisite ignorato: plugin attivi in rete, temi e transient degli altri siti | I (multisite) + E |
 | 27 ✅ | B | — | Con object cache persistente (Redis/Memcached) le azioni scrivono nel DB ma il sito continua a usare i valori in cache: nessun avviso | U (rilevamento del drop-in) |
 | 28 ✅ | B | `emergency.php:330` | "Cambia a tema default" può scegliere il tema attivo (rotto) o un child theme | I + E |
 | 29 ✅ | B | `emergency.php:138,155` | Il blocco conta dal primo errore, non dal quinto: finestra più corta del dichiarato | U (orologio iniettabile) |

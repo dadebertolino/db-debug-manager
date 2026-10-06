@@ -82,10 +82,16 @@ class DBDM_Em_Actions {
     private function disable_all_plugins(DBDM_Em_Request $request) {
         $current = $this->repo->active_plugins();
         if ($current === null) return array(self::unreadable_plugins());
-        if (!$current) return array(array('warn', 'Nessun plugin era attivo.'));
-        $this->repo->update_option('active_plugins', array());
-        $this->logger->log('ACTION', 'disable_all_plugins');
-        return array(array('ok', 'Tutti i plugin sono stati disattivati.'));
+        $network = (array) $this->repo->network_plugins();
+        if (!$current && !$network) return array(array('warn', 'Nessun plugin era attivo.'));
+
+        if ($current) $this->repo->update_option('active_plugins', array());
+        // 2.0.0 (bug 26): in multisite anche quelli attivi in rete.
+        if ($network) $this->repo->remove_network_plugins($network);
+        $this->logger->log('ACTION', 'disable_all_plugins' . ($network ? ' (rete: ' . count($network) . ')' : ''));
+        return array(array('ok', $network
+            ? sprintf('Tutti i plugin sono stati disattivati (%d attivi in rete).', count($network))
+            : 'Tutti i plugin sono stati disattivati.'));
     }
 
     /**
@@ -97,6 +103,12 @@ class DBDM_Em_Actions {
         $slug = $key !== '' && strlen($key) % 2 === 0 && ctype_xdigit($key) ? hex2bin($key) : '';
         if ($slug === '' || $slug === false) return array(array('err', 'Plugin non indicato.'));
 
+        // 2.0.0 (bug 26): plugin attivo in rete.
+        if (in_array($slug, (array) $this->repo->network_plugins(), true)) {
+            $this->repo->remove_network_plugins(array($slug));
+            $this->logger->log('ACTION', 'disable_network_plugin: ' . $slug);
+            return array(array('ok', 'Plugin disattivato in rete: ' . $slug));
+        }
         $current = $this->repo->active_plugins();
         if ($current === null) return array(self::unreadable_plugins());
         if (!in_array($slug, $current, true)) {

@@ -18,13 +18,59 @@ class DBDM_Em_Repository {
     /** @var string */
     private $table;
 
+    /** @var string */
+    private $sitemeta;
+
+    /** @var int|null Rete (multisite), null su un sito singolo. */
+    private $site_id;
+
     /**
-     * @param PDO    $pdo
-     * @param string $prefix Prefisso delle tabelle ($table_prefix).
+     * @param PDO      $pdo
+     * @param string   $prefix  Prefisso delle tabelle ($table_prefix).
+     * @param int|null $site_id Rete in multisite (SITE_ID_CURRENT_SITE),
+     *                          null su un sito singolo.
      */
-    public function __construct(PDO $pdo, $prefix) {
-        $this->pdo   = $pdo;
-        $this->table = '`' . $prefix . 'options`';
+    public function __construct(PDO $pdo, $prefix, $site_id = null) {
+        $this->pdo      = $pdo;
+        $this->table    = '`' . $prefix . 'options`';
+        $this->sitemeta = '`' . $prefix . 'sitemeta`';
+        $this->site_id  = $site_id === null ? null : (int) $site_id;
+    }
+
+    public function is_network() {
+        return $this->site_id !== null;
+    }
+
+    /**
+     * Plugin attivi in rete (2.0.0, bug 26), null su un sito singolo o se
+     * il valore manca o non è leggibile.
+     *
+     * @return string[]|null
+     */
+    public function network_plugins() {
+        $all = $this->network_plugins_raw();
+        return $all === null ? null : array_keys($all);
+    }
+
+    /**
+     * Toglie plugin dall'elenco di rete, conservando la data di attivazione
+     * degli altri.
+     *
+     * @param string[] $remove
+     */
+    public function remove_network_plugins(array $remove) {
+        $all = $this->network_plugins_raw();
+        if ($all === null) return;
+        $this->pdo->prepare("UPDATE {$this->sitemeta} SET meta_value = :v WHERE site_id = :s AND meta_key = 'active_sitewide_plugins'")
+            ->execute(array(':v' => serialize(array_diff_key($all, array_flip($remove))), ':s' => $this->site_id));
+    }
+
+    private function network_plugins_raw() {
+        if ($this->site_id === null) return null;
+        $stmt = $this->pdo->prepare("SELECT meta_value FROM {$this->sitemeta} WHERE site_id = :s AND meta_key = 'active_sitewide_plugins' LIMIT 1");
+        $stmt->execute(array(':s' => $this->site_id));
+        $v = DBDM_Emergency_Guard::maybe_unserialize($stmt->fetchColumn());
+        return is_array($v) ? $v : null;
     }
 
     /**
@@ -73,13 +119,20 @@ class DBDM_Em_Repository {
     }
 
     /**
-     * Cancella transient e transient di sito (anche i timeout).
+     * Cancella transient e transient di sito (anche i timeout), in
+     * multisite anche quelli della rete.
      *
      * @return int Righe eliminate.
      */
     public function delete_transients() {
-        return (int) $this->pdo->exec(
+        $deleted = (int) $this->pdo->exec(
             "DELETE FROM {$this->table} WHERE option_name LIKE '!_transient!_%' ESCAPE '!' OR option_name LIKE '!_site!_transient!_%' ESCAPE '!'"
         );
+        if ($this->site_id !== null) {
+            $stmt = $this->pdo->prepare("DELETE FROM {$this->sitemeta} WHERE site_id = :s AND meta_key LIKE '!_site!_transient!_%' ESCAPE '!'");
+            $stmt->execute(array(':s' => $this->site_id));
+            $deleted += $stmt->rowCount();
+        }
+        return $deleted;
     }
 }

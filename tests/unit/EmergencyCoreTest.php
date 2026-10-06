@@ -431,6 +431,41 @@ class EmergencyCoreTest extends TestCase {
 		$this->assertSame( $fallback, DBDM_Em_App::site_paths( array( 'content_dir' => $this->dir . '/manca', 'themes_dir' => array(), 'plugins_dir' => 'relativo' ), $plugin ), 'cartelle inesistenti o non valide' );
 	}
 
+	/**
+	 * Bug 26: multisite riconosciuto da wp-config.php.
+	 */
+	public function test_rete_da_wp_config(): void {
+		$this->assertNull( DBDM_Em_App::network_site_id( "<?php\ndefine( 'DB_NAME', 'x' );\n" ) );
+		$this->assertSame( 1, DBDM_Em_App::network_site_id( "<?php\ndefine( 'MULTISITE', true );\n" ) );
+		$this->assertSame( 3, DBDM_Em_App::network_site_id( "<?php\ndefine( 'MULTISITE', true );\ndefine( 'SITE_ID_CURRENT_SITE', 3 );\n" ) );
+		$this->assertNull( DBDM_Em_App::network_site_id( "<?php\ndefine( 'MULTISITE', false );\n" ) );
+	}
+
+	public function test_dashboard_con_plugin_di_rete(): void {
+		$store = array();
+		$view  = new DBDM_Em_View( new DBDM_Em_Session( $store ) );
+		$html  = $this->render( function () use ( $view ) {
+			$view->dashboard(
+				array(),
+				array(
+					'log_content'     => '',
+					'log_size'        => 0,
+					'active_plugins'  => array( 'a/a.php' ),
+					'network_plugins' => array( 'n/n.php' ),
+					'multisite'       => true,
+					'cur_theme'       => 'tt',
+					'consts_status'   => array(),
+					'php_error_log'   => '',
+					'php_log_content' => '',
+					'snapshots'       => array(),
+				)
+			);
+		} );
+		$this->assertStringContainsString( 'Plugin attivi (2)', $html );
+		$this->assertStringContainsString( '<code>n/n.php</code> <span class="tag tag-warn">rete</span>', $html );
+		$this->assertStringContainsString( 'sito principale', $html );
+	}
+
 	/* --- Flusso: errori del database (bug 34) ------------------------------ */
 
 	/**

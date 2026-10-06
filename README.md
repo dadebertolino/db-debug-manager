@@ -161,6 +161,7 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Emergency in multisite:** mostra e disattiva anche i plugin attivi in rete (la causa più comune di una rete ferma); "Disattiva tutti" e "Svuota transient" valgono anche per la rete. Tema e opzioni restano quelli del sito principale.
 - **Snapshot:** quelli automatici non espellono più quelli manuali (5 posti ciascuno); per plugin e temi lo snapshot automatico è fatto *prima* dell'aggiornamento (uno per richiesta, anche negli aggiornamenti in blocco). Il ripristino attiva e disattiva i plugin come la pagina Plugin (con i loro hook) e, in multisite, riporta anche i plugin attivi in rete. Lettura e scrittura degli snapshot sotto lock.
 - **Privacy (monitor query):** registra solo le pagine dell'amministratore che lo attiva dalla tab Query, per 30 minuti; mai le visite degli altri, il login, REST e AJAX. Prima salvava nel database le query di ogni visitatore.
 - **Disinstallazione:** eliminando il plugin vengono rimossi opzioni, transient, impostazioni utente e la cartella privata (snapshot, backup, log). Le costanti in `wp-config.php` restano: la pagina Plugin e la tab Costanti le elencano prima.
