@@ -270,6 +270,36 @@ class EmergencyCoreTest extends TestCase {
 	}
 
 	/**
+	 * Bug 19: con un byte UTF-8 non valido (Latin-1, coda tagliata a metà
+	 * carattere) htmlspecialchars() restituiva '' e il pannello restava vuoto.
+	 */
+	public function test_log_con_utf8_non_valido_resta_leggibile(): void {
+		$store   = array();
+		$view    = new DBDM_Em_View( new DBDM_Em_Session( $store ) );
+		$php_log = $this->dir . '/php.log';
+		touch( $php_log );
+		$html = $this->render( function () use ( $view, $php_log ) {
+			$view->dashboard(
+				array(),
+				array(
+					'log_content'     => "\xA8 metà carattere\nPHP Warning: caff\xE8 <b>\n",
+					'log_size'        => 100,
+					'active_plugins'  => array( "latin\xE9/x.php" ),
+					'cur_theme'       => "tema\xE9",
+					'consts_status'   => array(),
+					'php_error_log'   => $php_log,
+					'php_log_content' => "errore \xFF finale",
+					'snapshots'       => array(),
+				)
+			);
+		} );
+		$this->assertStringContainsString( "\u{FFFD} metà carattere\nPHP Warning: caff\u{FFFD} &lt;b&gt;", $html );
+		$this->assertStringContainsString( "errore \u{FFFD} finale", $html );
+		$this->assertStringContainsString( "<code>latin\u{FFFD}/x.php</code>", $html );
+		$this->assertStringContainsString( "<code>tema\u{FFFD}</code>", $html );
+	}
+
+	/**
 	 * Bug 18: lo slug finiva in una stringa JS tra apici dentro onsubmit;
 	 * l'entità &#039; viene decodificata dal browser prima di eseguire il JS,
 	 * quindi un apostrofo chiudeva la stringa.

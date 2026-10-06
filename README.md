@@ -161,6 +161,7 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Fix (emergency): debug.log e error log di PHP apparivano vuoti** se contenevano un byte non UTF-8 (testo Latin-1, coda tagliata a metà carattere). Ora i caratteri non validi sono mostrati come �.
 - **Fix (emergency): uno slug di plugin con un apostrofo rompeva la conferma di "Disattiva"** e poteva eseguire codice JavaScript nella dashboard. Il testo della conferma è ora codificato per JavaScript prima che per HTML.
 - **Interno: `emergency.php` diviso in classi** (`inc/emergency/`: richiesta, sessione e CSRF, accesso al database, log degli accessi, azioni, stato del sito, pagine, flusso). L'URL e il comportamento non cambiano; le parti si possono ora provare con test automatici.
 
