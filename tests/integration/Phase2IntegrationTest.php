@@ -177,6 +177,77 @@ class Phase2IntegrationTest extends WP_UnitTestCase {
 		}
 	}
 
+	/* --- Aggiornamento reale (bug 39) ------------------------------------- */
+
+	/**
+	 * ZIP di un plugin "db-debug-manager" minimale, versione $version.
+	 */
+	private function plugin_zip( $version ) {
+		$zip  = get_temp_dir() . 'dbdm-upgrade-' . $version . '-' . uniqid() . '.zip';
+		$arch = new ZipArchive();
+		$arch->open( $zip, ZipArchive::CREATE );
+		$arch->addFromString( 'db-debug-manager/db-debug-manager.php', "<?php\n/*\nPlugin Name: DB Debug Manager\nVersion: $version\n*/\n" );
+		$arch->addFromString( 'db-debug-manager/private-0123456789abcdef/vecchio.txt', 'cartella privata della 1.3.x' );
+		$arch->close();
+		return $zip;
+	}
+
+	/**
+	 * Fino alla 1.3.x la cartella privata stava dentro quella del plugin e
+	 * ogni aggiornamento la cancellava. Aggiornamento vero, con il core.
+	 */
+	public function test_un_aggiornamento_reale_non_tocca_la_cartella_privata(): void {
+		if ( ! class_exists( 'ZipArchive' ) ) {
+			$this->markTestSkipped( 'Estensione zip non disponibile.' );
+		}
+		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		add_filter(
+			'filesystem_method',
+			function () {
+				return 'direct';
+			}
+		);
+		$this->assertTrue( WP_Filesystem() );
+		$this->admin();
+
+		$private = DBDM_Emergency::private_dir();
+		file_put_contents( $private . 'snapshots.json', '[{"id":"prima","trigger":"manual"}]' );
+		file_put_contents( $private . 'wp-config.dbdm-bak', '<?php // backup' );
+		$target = WP_PLUGIN_DIR . '/db-debug-manager';
+		$zips   = array( $this->plugin_zip( '1.0' ), $this->plugin_zip( '2.0' ) );
+
+		try {
+			foreach ( $zips as $zip ) {
+				$upgrader = new Plugin_Upgrader( new Automatic_Upgrader_Skin() );
+				$result   = $upgrader->install( $zip, array( 'overwrite_package' => true ) );
+				$this->assertTrue( $result, is_wp_error( $result ) ? $result->get_error_message() : 'installazione' );
+			}
+
+			$this->assertStringContainsString( 'Version: 2.0', file_get_contents( $target . '/db-debug-manager.php' ), 'file del plugin sostituiti' );
+			$this->assertSame( '<?php // backup', file_get_contents( $private . 'wp-config.dbdm-bak' ) );
+			$ids = array_column( DBDM_Snapshots::get_all(), 'id' );
+			$this->assertContains( 'prima', $ids, 'snapshot esistenti intatti' );
+			$this->assertCount( 2, $ids, 'più lo snapshot prima dell\'installazione' );
+		} finally {
+			foreach ( $zips as $zip ) {
+				@unlink( $zip );
+			}
+			$this->rrmdir( $target );
+		}
+	}
+
+	private function rrmdir( $dir ) {
+		if ( ! is_dir( $dir ) ) {
+			return;
+		}
+		foreach ( array_diff( scandir( $dir ), array( '.', '..' ) ) as $item ) {
+			is_dir( "$dir/$item" ) ? $this->rrmdir( "$dir/$item" ) : unlink( "$dir/$item" );
+		}
+		rmdir( $dir );
+	}
+
 	/* --- Monitor query (bug 49) -------------------------------------------- */
 
 	private function run_capture() {
