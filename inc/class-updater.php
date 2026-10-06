@@ -8,7 +8,11 @@
  *   require_once PLUGIN_DIR . 'inc/class-updater.php';
  *   new DB_GitHub_Updater(__FILE__, 'dadebertolino', 'nome-repo');
  *
- * @version 1.0.0
+ * @version 1.1.0
+ *
+ * 1.1.0: riattiva il plugin dopo l'aggiornamento solo se era attivo (anche
+ *        a livello di rete); asset ZIP e zipball_url verificati; nessun
+ *        errore se $wp_filesystem non è disponibile.
  * @author Davide Bertolino
  */
 
@@ -25,7 +29,14 @@ class DB_GitHub_Updater {
     private $github_repo;
     private $cache_key;
     private $cache_expiry = 43200; // 12 ore
+    /** @var array{site:bool,network:bool}|null Stato di attivazione prima dell'aggiornamento. */
+    private $was_active = null;
 
+    /**
+     * @param string $plugin_file  __FILE__ del file principale del plugin
+     * @param string $github_user  Username/org GitHub (es. 'dadebertolino')
+     * @param string $github_repo  Nome repository (es. 'db-event-manager')
+     */
     public function __construct($plugin_file, $github_user, $github_repo) {
         $this->file            = $plugin_file;
         $this->plugin_basename = plugin_basename($plugin_file);
@@ -36,6 +47,8 @@ class DB_GitHub_Updater {
 
         add_filter('pre_set_site_transient_update_plugins', array($this, 'check_update'));
         add_filter('plugins_api', array($this, 'plugin_info'), 10, 3);
+        // Priorità 5: prima di deactivate_plugin_before_upgrade (10) del core.
+        add_filter('upgrader_pre_install', array($this, 'pre_install'), 5, 2);
         add_filter('upgrader_post_install', array($this, 'post_install'), 10, 3);
     }
 
@@ -73,15 +86,18 @@ class DB_GitHub_Updater {
             'html_url'    => $data->html_url ?? '',
         );
 
-        if (!empty($data->assets)) {
+        if (!empty($data->assets) && is_array($data->assets)) {
             foreach ($data->assets as $asset) {
-                if (substr($asset->name, -4) === '.zip') {
+                if (!is_object($asset) || !isset($asset->name, $asset->browser_download_url)) continue;
+                if (substr((string) $asset->name, -4) === '.zip' && is_string($asset->browser_download_url)) {
                     $release['zip_url'] = $asset->browser_download_url;
                     break;
                 }
             }
         }
-        if (empty($release['zip_url'])) {
+        // Ripiego sullo ZIP del sorgente (cartella radice da correggere in
+        // post_install). Se manca anche quello, niente aggiornamento.
+        if (empty($release['zip_url']) && !empty($data->zipball_url) && is_string($data->zipball_url)) {
             $release['zip_url'] = $data->zipball_url;
         }
 
@@ -131,7 +147,7 @@ class DB_GitHub_Updater {
             'author'        => $plugin_data['Author'] ?? '',
             'homepage'      => $plugin_data['PluginURI'] ?? '',
             'download_link' => $release['zip_url'],
-            'requires'      => $plugin_data['RequiresWP'] ?? '5.8',
+            'requires'      => $plugin_data['RequiresWP'] ?? '6.0',
             'requires_php'  => $plugin_data['RequiresPHP'] ?? '7.4',
             'tested'        => get_bloginfo('version'),
             'sections'      => array(
@@ -142,21 +158,49 @@ class DB_GitHub_Updater {
         );
     }
 
+    /**
+     * Annota se il plugin era attivo prima che il core lo disattivi per
+     * l'aggiornamento.
+     */
+    public function pre_install($response, $hook_extra) {
+        if (isset($hook_extra['plugin']) && $hook_extra['plugin'] === $this->plugin_basename) {
+            if (!function_exists('is_plugin_active')) {
+                require_once ABSPATH . 'wp-admin/includes/plugin.php';
+            }
+            $this->was_active = array(
+                'site'    => is_plugin_active($this->plugin_basename),
+                'network' => is_multisite() && is_plugin_active_for_network($this->plugin_basename),
+            );
+        }
+        return $response;
+    }
+
     public function post_install($response, $hook_extra, $result) {
         if (!isset($hook_extra['plugin']) || $hook_extra['plugin'] !== $this->plugin_basename) {
             return $result;
         }
+        if (!is_array($result) || empty($result['destination'])) {
+            return $result;
+        }
 
         global $wp_filesystem;
-        $install_dir = $result['destination'];
+        $install_dir = untrailingslashit($result['destination']);
         $proper_dir  = WP_PLUGIN_DIR . '/' . $this->plugin_slug;
 
-        if ($install_dir !== $proper_dir) {
-            $wp_filesystem->move($install_dir, $proper_dir);
+        if ($install_dir !== $proper_dir && is_object($wp_filesystem) && $wp_filesystem->move($install_dir, $proper_dir)) {
             $result['destination'] = $proper_dir;
         }
 
-        activate_plugin($this->plugin_basename);
+        // 1.1.0: riattiva solo se era attivo (prima attivava anche un plugin
+        // disattivato dall'admin). Se lo stato non è noto, non tocca nulla:
+        // nel flusso standard il core riattiva da sé il plugin che era attivo.
+        if (!empty($this->was_active['network'])) {
+            activate_plugin($this->plugin_basename, '', true);
+        } elseif (!empty($this->was_active['site'])) {
+            activate_plugin($this->plugin_basename);
+        }
+        $this->was_active = null;
+
         return $result;
     }
 }
