@@ -499,6 +499,24 @@ class EmergencyActionsTest extends TestCase {
 		$this->assertSame( array( 'a/a.php', 'b/b.php' ), $this->repo->get_option( 'active_plugins' ) );
 	}
 
+	/**
+	 * Bug 33: ogni campo inviato come array (anche csrf e a) viene trattato
+	 * come assente, senza TypeError né modifiche.
+	 */
+	public function test_campi_come_array_in_ogni_azione(): void {
+		$before = file_get_contents( $this->config );
+		$fields = array( 'plugin', 'const', 'enable', 'snap_id', 'restore_plugins', 'restore_theme' );
+		foreach ( array( 'disable_plugin', 'toggle_const', 'restore_snapshot' ) as $action ) {
+			$notices = $this->run_action( $action, array_fill_keys( $fields, array( 'x' ) ) );
+			$this->assertNotSame( 'ok', isset( $notices[0][0] ) ? $notices[0][0] : '', $action );
+		}
+		$this->assertSame( array(), $this->handle( array( 'a' => array( 'disable_all_plugins' ), 'csrf' => true ) ) );
+		$this->assertSame( 'err', $this->handle( array( 'a' => 'disable_all_plugins', 'csrf' => array( 'x' ) ) )[0][0] );
+
+		$this->assertSame( array( 'a/a.php', 'b/b.php' ), $this->repo->get_option( 'active_plugins' ) );
+		$this->assertSame( $before, file_get_contents( $this->config ) );
+	}
+
 	/* --- Errori -------------------------------------------------------------- */
 
 	public function test_azione_sconosciuta(): void {
