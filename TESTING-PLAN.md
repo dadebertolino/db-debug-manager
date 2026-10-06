@@ -83,7 +83,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 28 ✅ | B | `emergency.php:330` | "Cambia a tema default" può scegliere il tema attivo (rotto) o un child theme | I + E |
 | 29 ✅ | B | `emergency.php:138,155` | Il blocco conta dal primo errore, non dal quinto: finestra più corta del dichiarato | U (orologio iniettabile) |
 | 30 ✅ | B | `emergency.php:297` e azioni | Successo riportato anche quando nulla cambia (plugin non attivo, opzione mancante); token CSRF scaduto ignorato senza avviso | E |
-| 31 | B | `emergency.php:505` | Stato delle costanti letto male (`1`, `getenv`, condizionali) | U |
+| 31 ✅ | B | `emergency.php:505` | Stato delle costanti letto male (`1`, `getenv`, condizionali) | U |
 | 32 ✅ | C | `emergency.php:217,312,494` | `unserialize()` senza `allowed_classes => false` | U |
 | 33 ½ | C | `emergency.php:178` e altri | `csrf`/`password` inviati come array → TypeError, pagina 500 (anche senza login) | E |
 | 34 | C | `emergency.php:210` | `PDOException` non gestita (prefisso tabelle sbagliato) → 500 vuoto | U/E |

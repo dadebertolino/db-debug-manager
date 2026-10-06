@@ -171,6 +171,55 @@ class EmergencyCoreTest extends TestCase {
 		$this->assertSame( array_fill_keys( DBDM_Em_Status::MANAGED_CONSTANTS, null ), DBDM_Em_Status::constants_status( false ) );
 	}
 
+	/**
+	 * Bug 31: lo stato veniva letto con una regex (solo true/false/stringhe,
+	 * anche dentro i commenti).
+	 */
+	public function test_stato_delle_costanti_come_le_vede_php(): void {
+		putenv( 'DBDM_TEST_SAVEQUERIES=1' );
+		$status = DBDM_Em_Status::constants_status(
+			"<?php\n" .
+			"/* define( 'WP_DEBUG_DISPLAY', true ); */\n" .
+			"define( 'WP_DEBUG', 1 );\n" .
+			"defined( 'SCRIPT_DEBUG' ) || define( 'SCRIPT_DEBUG', true );\n" .
+			"define( 'SAVEQUERIES', getenv( 'DBDM_TEST_SAVEQUERIES' ) );\n" .
+			"define( 'WP_DEBUG_LOG', \$percorso );\n"
+		);
+		putenv( 'DBDM_TEST_SAVEQUERIES' );
+
+		$this->assertSame(
+			array(
+				'WP_DEBUG'         => true,
+				'WP_DEBUG_LOG'     => 'unknown',
+				'WP_DEBUG_DISPLAY' => null,
+				'SCRIPT_DEBUG'     => true,
+				'SAVEQUERIES'      => true,
+			),
+			$status
+		);
+	}
+
+	public function test_costante_dal_valore_non_determinabile_nella_dashboard(): void {
+		$store = array();
+		$view  = new DBDM_Em_View( new DBDM_Em_Session( $store ) );
+		$html  = $this->render( function () use ( $view ) {
+			$view->dashboard(
+				array(),
+				array(
+					'log_content'     => '',
+					'log_size'        => 0,
+					'active_plugins'  => array(),
+					'cur_theme'       => 'tt',
+					'consts_status'   => array( 'WP_DEBUG_LOG' => 'unknown' ),
+					'php_error_log'   => '',
+					'php_log_content' => '',
+					'snapshots'       => array(),
+				)
+			);
+		} );
+		$this->assertStringContainsString( '<span class="tag tag-warn">da verificare</span>', $html );
+	}
+
 	public function test_snapshot_dal_piu_recente(): void {
 		$file = $this->dir . '/snapshots.json';
 		$this->assertSame( array(), DBDM_Em_Status::snapshots( $file ) );

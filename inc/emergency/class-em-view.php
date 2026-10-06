@@ -128,6 +128,7 @@ class DBDM_Em_View {
                         <td>
                             <?php if ($val === true): ?><span class="tag tag-ok">ON</span>
                             <?php elseif ($val === false): ?><span class="tag tag-off">OFF</span>
+                            <?php elseif ($val === 'unknown'): ?><span class="tag tag-warn">da verificare</span>
                             <?php else: ?><span class="tag tag-off">non definita</span><?php endif; ?>
                         </td>
                         <td style="text-align:right;">

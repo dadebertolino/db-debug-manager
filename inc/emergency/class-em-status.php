@@ -65,25 +65,24 @@ class DBDM_Em_Status {
     }
 
     /**
-     * Stato delle costanti di debug lette da wp-config.php: true, false,
-     * null se non definite.
+     * Stato delle costanti di debug in wp-config.php come le vede PHP
+     * (2.0.0, bug 31: prima una regex che ignorava 1, getenv() e le define
+     * condizionali e leggeva anche quelle nei commenti): true/false secondo
+     * il valore, 'unknown' se definita con un'espressione non valutabile,
+     * null se non definita.
      *
-     * @return array<string,bool|null>
+     * @return array<string,bool|string|null>
      */
     public static function constants_status($wp_config_content) {
-        $status = array();
+        $content = is_string($wp_config_content) ? $wp_config_content : '';
+        $values  = $content !== '' ? DBDM_Standalone_Config::effective_defines($content) : array();
+        $defined = $content !== '' ? array_column(DBDM_Standalone_Config::find_defines($content), 'name') : array();
+        $status  = array();
         foreach (self::MANAGED_CONSTANTS as $c) {
-            // Cattura bool ma anche stringhe (WP_DEBUG_LOG può essere un path custom).
-            if (preg_match('/^[ \t]*define\s*\(\s*[\'"]' . preg_quote($c, '/') . '[\'"]\s*,\s*(true|false|\'[^\']*\'|"[^"]*")\s*\)\s*;/mi', (string) $wp_config_content, $m)) {
-                $raw = strtolower(trim($m[1]));
-                if ($raw === 'true') {
-                    $status[$c] = true;
-                } elseif ($raw === 'false') {
-                    $status[$c] = false;
-                } else {
-                    // Stringa: non vuota = attiva (path custom). Vuota = false.
-                    $status[$c] = trim($m[1], '\'"') !== '';
-                }
+            if (array_key_exists($c, $values)) {
+                $status[$c] = (bool) $values[$c];
+            } elseif (in_array($c, $defined, true)) {
+                $status[$c] = 'unknown';
             } else {
                 $status[$c] = null;
             }

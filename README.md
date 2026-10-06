@@ -161,6 +161,7 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Fix (emergency): stato delle costanti di debug sbagliato** con `define( 'WP_DEBUG', 1 )`, valori da `getenv()`, `define` condizionali o copie commentate. Ora è letto come lo vede PHP; un valore non determinabile è indicato come "da verificare".
 - **Fix (emergency): azioni riportate come riuscite anche senza effetto.** Un plugin già disattivato, nessun transient, un log già vuoto ora danno un avviso giallo; un elenco dei plugin illeggibile, un'azione sconosciuta o un modulo scaduto (prima ignorato in silenzio) danno un errore. "Disattiva" funziona anche con nomi di plugin non UTF-8.
 - **Fix (emergency): "Cambia a tema default" poteva scegliere il tema rotto stesso o un child theme.** Ora esclude il tema attivo e il suo padre e sceglie solo temi completi.
 - **Fix (emergency): con `WP_CONTENT_DIR` o la cartella dei plugin spostati**, l'emergency cercava temi, plugin e `debug.log` nelle posizioni standard (cambio di tema e ripristino degli snapshot fallivano). Ora usa i percorsi che WordPress salva insieme alla cartella privata.
