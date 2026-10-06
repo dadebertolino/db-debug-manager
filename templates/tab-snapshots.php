@@ -39,7 +39,7 @@ $trigger_labels = array(
             </p>
             <button type="submit" class="db-ui-btn db-ui-btn-primary">📸 <?php esc_html_e('Crea snapshot adesso', 'db-debug-manager'); ?></button>
             <span class="db-ui-text-muted" style="margin-left:12px; font-size:12px;">
-                <?php printf(esc_html__('Massimo %d snapshot, FIFO.', 'db-debug-manager'), absint(DBDM_Snapshots::MAX_SNAPSHOTS)); ?>
+                <?php printf(esc_html__('Si conservano gli ultimi %d snapshot manuali e gli ultimi %d automatici.', 'db-debug-manager'), absint(DBDM_Snapshots::MAX_SNAPSHOTS), absint(DBDM_Snapshots::MAX_SNAPSHOTS)); ?>
             </span>
         </form>
     </div>
@@ -192,7 +192,7 @@ return ($d && $d !== '.') ? $d : $p;
                                 <input type="hidden" name="action" value="dbdm_delete_snapshot">
                                 <input type="hidden" name="id" value="<?php echo esc_attr($snap['id']); ?>">
                                 <?php wp_nonce_field('dbdm_delete_snapshot'); ?>
-                                <button type="submit" class="db-ui-btn db-ui-btn-sm">🗑</button>
+                                <button type="submit" class="db-ui-btn db-ui-btn-sm" aria-label="<?php esc_attr_e('Elimina snapshot', 'db-debug-manager'); ?>" title="<?php esc_attr_e('Elimina snapshot', 'db-debug-manager'); ?>"><span aria-hidden="true">🗑</span></button>
                             </form>
                         </div>
                     </div>

@@ -77,12 +77,13 @@ $const_descriptions = array(
                     <tr>
                         <td>
                             <input type="checkbox"
+                                id="dbdm-const-<?php echo esc_attr($const); ?>"
                                 name="dbdm[<?php echo esc_attr($const); ?>]"
                                 value="1"
                                 <?php checked($is_on); ?>
                                 <?php disabled(!$writable); ?>>
                         </td>
-                        <td><code><?php echo esc_html($const); ?></code></td>
+                        <td><label for="dbdm-const-<?php echo esc_attr($const); ?>"><code><?php echo esc_html($const); ?></code></label></td>
                         <td>
                             <?php if ($is_custom_path): ?>
                                 <span class="db-ui-badge db-ui-badge-success"><?php esc_html_e('Attiva', 'db-debug-manager'); ?></span>

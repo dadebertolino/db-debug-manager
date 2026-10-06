@@ -66,7 +66,7 @@ $monitor_left = DBDM_Queries::remaining(get_current_user_id());
             </div>
 
             <div class="dbdm-log-search">
-                <input type="text" id="dbdm-q-filter" placeholder="<?php esc_attr_e('Filtra SQL (es: wp_options, SELECT, JOIN)...', 'db-debug-manager'); ?>">
+                <input type="text" id="dbdm-q-filter" aria-label="<?php esc_attr_e('Filtra le query', 'db-debug-manager'); ?>" placeholder="<?php esc_attr_e('Filtra SQL (es: wp_options, SELECT, JOIN)...', 'db-debug-manager'); ?>">
             </div>
 
             <table class="db-ui-table dbdm-q-table" id="dbdm-q-table">

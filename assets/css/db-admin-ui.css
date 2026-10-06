@@ -17,7 +17,7 @@
     --db-danger-light: #fce4e4;
     --db-text: #1d2327;
     --db-text-muted: #646970;
-    --db-text-light: #999;
+    --db-text-light: #757575; /* 4,6:1 su bianco (WCAG AA); era #999, 2,8:1 */
     --db-bg: #ffffff;
     --db-bg-subtle: #f6f7f7;
     --db-bg-hover: #f0f0f1;

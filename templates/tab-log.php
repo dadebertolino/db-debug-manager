@@ -55,7 +55,7 @@ $log_content = $log_exists ? DBDM_Log::tail(500) : '';
         <?php endif; ?>
         <!-- 2.0.0 (bug 57): viewer sempre presente, così aggiorna e auto-refresh funzionano anche se il log nasce dopo. -->
         <div class="dbdm-log-search">
-            <input type="text" id="dbdm-log-filter" placeholder="<?php esc_attr_e('Filtra righe (es: Fatal, Notice, Warning)...', 'db-debug-manager'); ?>">
+            <input type="text" id="dbdm-log-filter" aria-label="<?php esc_attr_e('Filtra le righe del log', 'db-debug-manager'); ?>" placeholder="<?php esc_attr_e('Filtra righe (es: Fatal, Notice, Warning)...', 'db-debug-manager'); ?>">
         </div>
         <pre id="dbdm-log-viewer" class="dbdm-log-viewer"><?php echo esc_html($log_content); ?></pre>
     </div>
