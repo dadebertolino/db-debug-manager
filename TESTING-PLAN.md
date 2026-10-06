@@ -223,16 +223,21 @@ rilevamento object cache (27), `Update URI`/`DISALLOW_FILE_MODS` (50).
 
 WordPress + MySQL reali, anche multisite:
 
-- [ ] salvataggio costanti end-to-end e valore effettivo in un processo
-      separato; backup = stato precedente;
-- [ ] aggiornamento reale del plugin con `Plugin_Upgrader` da ZIP locale:
+- [x] salvataggio costanti end-to-end e valore effettivo in un processo
+      separato; backup = stato precedente (coperto dagli E2E della Fase A);
+- [x] aggiornamento reale del plugin con `Plugin_Upgrader` da ZIP locale:
       snapshot e backup sopravvivono (bug 39);
-- [ ] snapshot: limiti per tipo, cattura prima dell'aggiornamento, diff,
+- [x] snapshot: limiti per tipo, cattura prima dell'aggiornamento, diff,
       ripristino via API del core, autoload, multisite (45–47, 17);
-- [ ] capability in multisite (40);
-- [ ] monitor query: niente dati dei visitatori (49);
-- [ ] disattivazione e disinstallazione (14, 51);
-- [ ] permessi e concorrenza della cartella privata (55, 56).
+- [x] capability in multisite (40, Fase A);
+- [x] monitor query: niente dati dei visitatori (49);
+- [x] disattivazione e disinstallazione (14, 51);
+- [x] permessi e concorrenza della cartella privata (55, 56).
+
+Fatto (2026-10-06): bug 7 (resto), 26, 45, 46, 47, 49, 51, 55, 56; unit
+199, integration in `Phase2IntegrationTest`. L'integration ha trovato che
+`add_option()` non è atomico (sovrascrive con ON DUPLICATE KEY UPDATE): il
+token usa INSERT IGNORE.
 
 ## 6. Fase 3 — E2E "al massimo" (stima 120+)
 

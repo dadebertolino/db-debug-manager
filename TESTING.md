@@ -72,6 +72,13 @@ PHP valido.
 I test estendono `WP_UnitTestCase`; i file finiscono in `IntegrationTest.php`.
 I test `@group ms-required` girano solo con `WP_MULTISITE=1`.
 
+`Phase2IntegrationTest` prova sul core vero: aggiornamento con
+`Plugin_Upgrader` da ZIP locale (cartella privata intatta), snapshot prima
+degli aggiornamenti, ripristino dei plugin con gli hook (un plugin di prova
+in `WP_PLUGIN_DIR` registra attivazione e disattivazione), plugin di rete,
+monitor query per utente, disinstallazione (anche su ogni sito della rete),
+token della cartella privata con una richiesta concorrente simulata.
+
 ## E2E: ambiente e fixture
 
 `.wp-env.json` monta il plugin e il mu-plugin
