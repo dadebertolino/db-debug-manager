@@ -210,6 +210,36 @@ if ( ! function_exists( '_doing_it_wrong' ) ) {
 	}
 }
 
+/* --- Errori e permessi sui file ------------------------------------------ */
+
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error { // phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
+		public $code;
+		public $message;
+		public function __construct( $code = '', $message = '' ) {
+			$this->code    = $code;
+			$this->message = $message;
+		}
+		public function get_error_code() {
+			return $this->code;
+		}
+		public function get_error_message() {
+			return $this->message;
+		}
+	}
+}
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $thing ) {
+		return $thing instanceof WP_Error;
+	}
+}
+if ( ! function_exists( 'wp_is_file_mod_allowed' ) ) {
+	// Come WordPress: DISALLOW_FILE_MODS, poi il filtro file_mod_allowed.
+	function wp_is_file_mod_allowed( $context ) {
+		return apply_filters( 'file_mod_allowed', ! defined( 'DISALLOW_FILE_MODS' ) || ! DISALLOW_FILE_MODS, $context );
+	}
+}
+
 /* --- i18n ----------------------------------------------------------------- */
 
 if ( ! function_exists( '__' ) ) {

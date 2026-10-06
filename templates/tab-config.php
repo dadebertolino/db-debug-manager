@@ -28,7 +28,15 @@ $const_descriptions = array(
 );
 ?>
 
-<?php if (!$writable): ?>
+<?php if (!DBDM_Config::file_mods_allowed()): ?>
+    <div class="db-ui-alert db-ui-alert-warning">
+        <span class="db-ui-alert-icon">🔒</span>
+        <span>
+            <strong><?php esc_html_e('Modifiche ai file disattivate (DISALLOW_FILE_MODS).', 'db-debug-manager'); ?></strong><br>
+            <?php esc_html_e('Il plugin non modifica wp-config.php: le costanti qui sotto sono in sola lettura e vanno cambiate a mano.', 'db-debug-manager'); ?>
+        </span>
+    </div>
+<?php elseif (!$writable): ?>
     <div class="db-ui-alert db-ui-alert-danger">
         <span class="db-ui-alert-icon">🔒</span>
         <span>

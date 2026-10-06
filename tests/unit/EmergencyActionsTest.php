@@ -354,6 +354,20 @@ class EmergencyActionsTest extends TestCase {
 		$this->assertSame( $this->private . 'debug.log', $this->log_define(), 'un valore ricordato che porta al log pubblico è ignorato' );
 	}
 
+	/**
+	 * Bug 50: con DISALLOW_FILE_MODS l'emergency non scrive wp-config.php.
+	 */
+	public function test_con_disallow_file_mods_niente_scrittura(): void {
+		DBDM_Standalone_Config::set_constants( $this->config, array( 'DISALLOW_FILE_MODS' => 'true' ) );
+		$before = file_get_contents( $this->config );
+
+		$notices = $this->run_action( 'toggle_const', array( 'const' => 'WP_DEBUG', 'enable' => '1' ) );
+
+		$this->assertSame( 'err', $notices[0][0] );
+		$this->assertStringContainsString( 'DISALLOW_FILE_MODS', $notices[0][1] );
+		$this->assertSame( $before, file_get_contents( $this->config ) );
+	}
+
 	public function test_costante_non_gestita_ignorata(): void {
 		$before = file_get_contents( $this->config );
 		$this->assertSame( array(), $this->run_action( 'toggle_const', array( 'const' => 'DB_PASSWORD', 'enable' => '1' ) ) );

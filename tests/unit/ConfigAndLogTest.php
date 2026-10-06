@@ -78,4 +78,24 @@ class ConfigAndLogTest extends TestCase {
 		$this->assertTrue( DBDM_Standalone_Config::php_lint_string( $out ) );
 		$this->assertSame( $path, DBDM_Standalone_Config::effective_defines( $out )['WP_DEBUG_LOG'] );
 	}
+
+	/* --- Bug 50: Update URI e DISALLOW_FILE_MODS ---------------------------- */
+
+	public function test_update_uri_verso_il_repository_dell_updater(): void {
+		$header = file_get_contents( DBDM_PLUGIN_FILE, false, null, 0, 2048 );
+		$this->assertSame( 1, preg_match( '/^\s*\*\s*Update URI:\s*(\S+)\s*$/m', $header, $m ), 'senza Update URI uno slug omonimo su wordpress.org può proporre aggiornamenti' );
+		$this->assertSame( 'https://github.com/dadebertolino/db-debug-manager', $m[1] );
+	}
+
+	public function test_con_disallow_file_mods_wp_config_non_si_tocca(): void {
+		add_filter( 'file_mod_allowed', function ( $allowed, $context ) {
+			return 'dbdm_wp_config' === $context ? false : $allowed;
+		}, 10, 2 );
+
+		$this->assertFalse( DBDM_Config::file_mods_allowed() );
+		$this->assertFalse( DBDM_Config::is_writable() );
+		$result = DBDM_Config::set_constants( array( 'WP_DEBUG' => true ) );
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'dbdm_file_mods_disallowed', $result->get_error_code() );
+	}
 }

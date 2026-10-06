@@ -161,6 +161,8 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **`Update URI` nell'intestazione del plugin:** WordPress non può più proporre come aggiornamento un plugin omonimo di wordpress.org.
+- **Rispetto di `DISALLOW_FILE_MODS`:** con le modifiche ai file disattivate, né il pannello né l'emergency scrivono `wp-config.php`; il pannello lo spiega.
 - **Fix: `define( 'WP_DEBUG', 1 )` appariva spenta nel pannello** e salvando un'altra costante veniva riscritta `false`. Ora ogni costante è attiva se il suo valore è vero per PHP; `WP_DEBUG_LOG` con `'1'` o `'true'` non è più mostrata come "file custom".
 - **Fix: la regola Nginx suggerita nella tab Emergency proteggeva la vecchia cartella** dentro il plugin. Ora indica `wp-content/dbdm-private-*` (anche con `wp-content` spostata). Chi aveva copiato la regola precedente dovrebbe sostituirla (nel frattempo i file restano protetti dal nome casuale della cartella).
 - **Sicurezza (emergency): nessuna informazione prima del login.** Se l'accesso non è disponibile la pagina lo dice e basta; il motivo (disattivato, senza password, database, cartella privata) va nel log degli errori di PHP. Dopo il login l'error log di PHP mostra solo le voci di questo sito, non quelle di altri siti sullo stesso server.

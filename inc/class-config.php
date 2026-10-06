@@ -33,11 +33,19 @@ class DBDM_Config {
     }
 
     /**
-     * True se wp-config.php è scrivibile.
+     * Modifiche ai file consentite (2.0.0, bug 50): con DISALLOW_FILE_MODS
+     * (o il filtro file_mod_allowed) il plugin non scrive wp-config.php.
+     */
+    public static function file_mods_allowed() {
+        return wp_is_file_mod_allowed('dbdm_wp_config');
+    }
+
+    /**
+     * True se il plugin può scrivere wp-config.php.
      */
     public static function is_writable() {
         $path = self::get_config_path();
-        return $path && is_writable($path);
+        return self::file_mods_allowed() && $path && is_writable($path);
     }
 
     /**
@@ -105,6 +113,9 @@ class DBDM_Config {
             $source[$name] = self::format_value($value);
         }
         if (!$source) return true;
+        if (!self::file_mods_allowed()) {
+            return new WP_Error('dbdm_file_mods_disallowed', __('Modifiche ai file disattivate (DISALLOW_FILE_MODS): wp-config.php va modificato a mano.', 'db-debug-manager'));
+        }
 
         $path = self::get_config_path();
         if (!$path) {

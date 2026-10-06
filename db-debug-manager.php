@@ -10,6 +10,7 @@
  * Text Domain: db-debug-manager
  * Requires at least: 6.0
  * Requires PHP: 7.4
+ * Update URI: https://github.com/dadebertolino/db-debug-manager
  */
 
 if (!defined('ABSPATH')) exit;

@@ -107,7 +107,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 47 | B | `class-snapshots.php:115` | Multisite: plugin attivi in rete ignorati in cattura, diff e ripristino | I (multisite) |
 | 48 | B | `class-admin.php:303,278` | "Ripristino completato" ed "eliminato" mostrati anche in caso di errore | E |
 | 49 | B | `class-queries.php:31-64` | Il monitor salva fino a 500 query complete a ogni richiesta pubblica (login, REST, checkout, WP-CLI): email, indirizzi, token di sessione nel database e nei backup; una scrittura pesante per richiesta | I |
-| 50 | B | `db-debug-manager.php` | Manca `Update URI`: lo slug può ricevere "aggiornamenti" da un plugin omonimo su wordpress.org; `DISALLOW_FILE_MODS` non rispettato per `wp-config.php` | U |
+| 50 ✅ | B | `db-debug-manager.php` | Manca `Update URI`: lo slug può ricevere "aggiornamenti" da un plugin omonimo su wordpress.org; `DISALLOW_FILE_MODS` non rispettato per `wp-config.php` | U |
 | 51 | C | — | Nessuna disinstallazione: restano opzioni, transient, cartella privata e le costanti scritte in `wp-config.php` | I |
 | 52 | C | `class-log.php:57` | Lettura della coda del log quadratica, memoria illimitata su righe lunghissime; `tail()` restituisce N+1 righe | U |
 | 53 | C | `class-admin.php:165` | Download del log: buffer non svuotati, `Content-Length` che cambia, niente `nosniff` | E |

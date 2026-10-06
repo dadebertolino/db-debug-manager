@@ -176,6 +176,11 @@ class DBDM_Em_Actions {
      * @return true|string true o messaggio di errore.
      */
     private function toggle_constant($name, $value) {
+        // 2.0.0 (bug 50): come il pannello, niente scritture con DISALLOW_FILE_MODS.
+        $defines = DBDM_Standalone_Config::effective_defines((string) @file_get_contents($this->config_path));
+        if (!empty($defines['DISALLOW_FILE_MODS'])) {
+            return 'modifiche ai file disattivate (DISALLOW_FILE_MODS): wp-config.php va modificato a mano.';
+        }
         $source = $value ? 'true' : 'false';
         if ($name === 'WP_DEBUG_LOG') {
             // Come il pannello (DBDM_Admin::constants_to_write()): acceso, il
