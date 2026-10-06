@@ -34,6 +34,11 @@ jobs:
           git archive --format=zip --prefix=db-debug-manager/ \
             -o "db-debug-manager-${GITHUB_REF_NAME#v}.zip" "$GITHUB_REF_NAME"
           unzip -l "db-debug-manager-${GITHUB_REF_NAME#v}.zip" | head -20
+          # Nessun file di sviluppo nel pacchetto distribuito.
+          if unzip -l "db-debug-manager-${GITHUB_REF_NAME#v}.zip" | grep -E 'db-debug-manager/(tests|bin|node_modules|vendor|private)|package(-lock)?\.json|composer\.json|phpunit|playwright|\.wp-env|TESTING'; then
+            echo "::error::Lo ZIP contiene file di sviluppo."
+            exit 1
+          fi
 
       - name: Crea/aggiorna Release con lo ZIP
         uses: softprops/action-gh-release@v2

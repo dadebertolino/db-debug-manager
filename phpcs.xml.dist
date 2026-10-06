@@ -6,6 +6,8 @@
     <exclude-pattern>*/.git/*</exclude-pattern>
     <exclude-pattern>*/node_modules/*</exclude-pattern>
     <exclude-pattern>*/vendor/*</exclude-pattern>
+    <!-- Test e fixture: non fanno parte del pacchetto distribuito. -->
+    <exclude-pattern>*/tests/*</exclude-pattern>
 
     <arg value="sp"/>
     <arg name="extensions" value="php"/>
