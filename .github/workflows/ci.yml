@@ -101,10 +101,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 5.8 = minimo dichiarato nel plugin header, latest = versione corrente.
+        # 6.0 = minimo previsto dal piano (§7; la test suite di 5.8 non
+        # supporta PHPUnit 9), latest = versione corrente.
         include:
-          - wp: '5.8'
-            php: '7.4'
+          - wp: '6.0'
+            php: '8.0'
             multisite: '0'
           - wp: latest
             php: '8.3'

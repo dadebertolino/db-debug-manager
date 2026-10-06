@@ -165,8 +165,9 @@ Come DB Privacy Hub (`../db-privacy-hub`), con queste aggiunte:
 Nota: la fixture ha già le varianti `golden` e `literal` di `wp-config.php`;
 le altre del corpus e i plugin/temi di prova (fatal on demand, child theme,
 nome Latin-1, slug con apostrofo) si aggiungono con i bug che li usano.
-L'integration gira sul minimo dichiarato oggi (WordPress 5.8) finché non si
-conferma il passaggio a 6.0.
+L'integration gira su WordPress 6.0 e latest: la test suite di 5.8 (minimo
+dichiarato oggi) non supporta PHPUnit 9, un motivo in più per il passaggio a
+6.0 proposto in §7.
 
 ## 4. Fase 1 — Refactor per la testabilità + unit test
 

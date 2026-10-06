@@ -99,7 +99,12 @@ function dbdm_e2e_wp_config( $variant ) {
 					$golden
 				);
 			}
-			return $golden;
+			global $table_prefix;
+			return preg_replace(
+				'/\$table_prefix\s*=\s*getenv_docker\(.*\);/',
+				'$table_prefix = ' . var_export( $table_prefix, true ) . ';',
+				$golden
+			);
 	}
 	return new WP_Error( 'dbdm_e2e_variant', 'Variante di wp-config sconosciuta: ' . $variant, array( 'status' => 400 ) );
 }
@@ -251,8 +256,9 @@ function dbdm_e2e_state() {
 		'php'                => PHP_VERSION,
 		'constants'          => dbdm_e2e_effective_constants(),
 		'debug_log'          => file_exists( $paths['log'] ) ? filesize( $paths['log'] ) : null,
-		'private'            => $private,
-		'options'            => array_map(
+		// Oggetti anche se vuoti: in JSON {} e non [].
+		'private'            => (object) $private,
+		'options'            => (object) array_map(
 			function ( $row ) {
 				return $row->option_value;
 			},

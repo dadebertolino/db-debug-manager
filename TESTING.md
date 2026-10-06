@@ -14,7 +14,7 @@ Il piano di lavoro (bug noti, decisioni, fasi) è in `TESTING-PLAN.md`.
 | **lint** | `php -l` su PHP 7.4 e 8.3 | ogni push/PR |
 | **phpcs** | WPCS (sicurezza ed escaping bloccanti) + compatibilità PHP 7.4+ | ogni push/PR |
 | **unit** | logica pura (PHPUnit), matrice PHP 7.4–8.4 | ogni push/PR |
-| **integration** | WordPress + MySQL reali: minimo dichiarato, ultima versione, ultima versione multisite | dopo lint |
+| **integration** | WordPress + MySQL reali: 6.0, ultima versione, ultima versione multisite | dopo lint |
 | **e2e** | wp-env + Playwright: pannello admin ed `emergency.php` via HTTP | dopo lint, phpcs e unit |
 
 `composer.lock` non è versionato (solo dipendenze di sviluppo); le dipendenze
