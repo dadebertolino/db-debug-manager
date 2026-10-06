@@ -127,9 +127,8 @@ class DBDM_Emergency {
      */
     public static function private_dir() {
         $token = get_option(self::OPTION_DIR_TOKEN, '');
-        if (!$token || !preg_match('/^[a-f0-9]{16}$/', $token)) {
-            $token = bin2hex(random_bytes(8));
-            update_option(self::OPTION_DIR_TOKEN, $token, false);
+        if (!self::valid_token($token)) {
+            $token = self::create_token();
         }
 
         $dir = WP_CONTENT_DIR . '/dbdm-private-' . $token;
@@ -146,6 +145,32 @@ class DBDM_Emergency {
             update_option(self::OPTION_SITE_PATHS, $paths, false);
         }
         return $dir . '/';
+    }
+
+    private static function valid_token($token) {
+        return is_string($token) && preg_match('/^[a-f0-9]{16}$/', $token);
+    }
+
+    /**
+     * Nuovo token della cartella privata. 2.0.0 (bug 55): add_option()
+     * fallisce se un'altra richiesta lo ha appena creato, e allora vale il
+     * suo (prima ciascuna richiesta scriveva il proprio e creava una
+     * cartella diversa).
+     */
+    private static function create_token() {
+        $new = bin2hex(random_bytes(8));
+        if (add_option(self::OPTION_DIR_TOKEN, $new, '', false)) {
+            return $new;
+        }
+        wp_cache_delete(self::OPTION_DIR_TOKEN, 'options');
+        wp_cache_delete('notoptions', 'options');
+        wp_cache_delete('alloptions', 'options');
+        $existing = get_option(self::OPTION_DIR_TOKEN, '');
+        if (self::valid_token($existing)) {
+            return $existing;
+        }
+        update_option(self::OPTION_DIR_TOKEN, $new, false);
+        return $new;
     }
 
     /**
@@ -207,12 +232,16 @@ class DBDM_Emergency {
     private static function ensure_private_dir($dir) {
         if (!is_dir($dir)) {
             @mkdir($dir, 0750);
+            // Creata da root (WP-CLI): stesso proprietario di wp-content (bug 55).
+            DBDM_Standalone_Config::restore_owner($dir, @fileowner(dirname($dir)), @filegroup(dirname($dir)));
         }
         if (!file_exists($dir . '/.htaccess')) {
             @file_put_contents($dir . '/.htaccess', self::htaccess_rules());
+            DBDM_Standalone_Config::restore_owner($dir . '/.htaccess', @fileowner($dir), @filegroup($dir));
         }
         if (!file_exists($dir . '/index.php')) {
             @file_put_contents($dir . '/index.php', "<?php // Silence is golden.\n");
+            DBDM_Standalone_Config::restore_owner($dir . '/index.php', @fileowner($dir), @filegroup($dir));
         }
     }
 

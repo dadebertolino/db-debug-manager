@@ -102,18 +102,18 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 42 ✅ | A | `class-snapshots.php:206` | Un nome di plugin con UTF-8 non valido fa fallire `json_encode` e la scrittura **cancella tutti gli snapshot** | U |
 | 43 | B | `admin.js:20-42` | "Aggiorna" e auto-refresh del log mostrano sempre il contenuto di quando la pagina è stata caricata (verificato) | E |
 | 44 | B | `tab-log.php:65`, `tab-queries.php:67` | Un byte UTF-8 non valido rende vuoto il viewer | E |
-| 45 | B | `class-snapshots.php:48-64,154` | Gli snapshot automatici (uno per aggiornamento, dopo l'aggiornamento) espellono quelli manuali dai 5 posti; deduplica che ignora temi e core | I |
-| 46 ½ | B | `class-snapshots.php:313,328` | Ripristino con `update_option` invece di `switch_theme()`/attivazione: niente hook, tema padre non verificato, `autoload` portato a `false` su `active_plugins`, `stylesheet`, `template` | I |
-| 47 | B | `class-snapshots.php:115` | Multisite: plugin attivi in rete ignorati in cattura, diff e ripristino | I (multisite) |
+| 45 ✅ | B | `class-snapshots.php:48-64,154` | Gli snapshot automatici (uno per aggiornamento, dopo l'aggiornamento) espellono quelli manuali dai 5 posti; deduplica che ignora temi e core | I |
+| 46 ✅ | B | `class-snapshots.php:313,328` | Ripristino con `update_option` invece di `switch_theme()`/attivazione: niente hook, tema padre non verificato, `autoload` portato a `false` su `active_plugins`, `stylesheet`, `template` | I |
+| 47 ✅ | B | `class-snapshots.php:115` | Multisite: plugin attivi in rete ignorati in cattura, diff e ripristino | I (multisite) |
 | 48 | B | `class-admin.php:303,278` | "Ripristino completato" ed "eliminato" mostrati anche in caso di errore | E |
-| 49 | B | `class-queries.php:31-64` | Il monitor salva fino a 500 query complete a ogni richiesta pubblica (login, REST, checkout, WP-CLI): email, indirizzi, token di sessione nel database e nei backup; una scrittura pesante per richiesta | I |
+| 49 ✅ | B | `class-queries.php:31-64` | Il monitor salva fino a 500 query complete a ogni richiesta pubblica (login, REST, checkout, WP-CLI): email, indirizzi, token di sessione nel database e nei backup; una scrittura pesante per richiesta | I |
 | 50 ✅ | B | `db-debug-manager.php` | Manca `Update URI`: lo slug può ricevere "aggiornamenti" da un plugin omonimo su wordpress.org; `DISALLOW_FILE_MODS` non rispettato per `wp-config.php` | U |
-| 51 | C | — | Nessuna disinstallazione: restano opzioni, transient, cartella privata e le costanti scritte in `wp-config.php` | I |
+| 51 ✅ | C | — | Nessuna disinstallazione: restano opzioni, transient, cartella privata e le costanti scritte in `wp-config.php` | I |
 | 52 ✅ | C | `class-log.php:57` | Lettura della coda del log quadratica, memoria illimitata su righe lunghissime; `tail()` restituisce N+1 righe | U |
 | 53 | C | `class-admin.php:165` | Download del log: buffer non svuotati, `Content-Length` che cambia, niente `nosniff` | E |
 | 54 | C | `page.php:24-65` | Messaggi `err` dalla query string mostrati in admin (contenuto arbitrario via link) | E |
-| 55 | C | `class-emergency.php:111` | Cartella privata `0755`, file `0644` (backup con credenziali leggibile da altri utenti su hosting condiviso); token creato due volte in caso di richieste concorrenti; cartella creata da root con WP-CLI | I |
-| 56 | C | `class-snapshots.php:86` | Lettura e scrittura degli snapshot senza lock tra pannello ed emergency | I |
+| 55 ✅ | C | `class-emergency.php:111` | Cartella privata `0755`, file `0644` (backup con credenziali leggibile da altri utenti su hosting condiviso); token creato due volte in caso di richieste concorrenti; cartella creata da root con WP-CLI | I |
+| 56 ✅ | C | `class-snapshots.php:86` | Lettura e scrittura degli snapshot senza lock tra pannello ed emergency | I |
 | 57 | C | `admin.js` | Senza `debug.log` al caricamento il viewer non esiste e l'auto-refresh non fa nulla; nessun `.fail()` (nonce scaduto) | E |
 | 58 | C | template | i18n assente (`load_plugin_textdomain`, `Domain Path`); stringhe non traducibili; percorso del backup indicato in modo errato | — |
 | 59 | C | template | Accessibilità: checkbox delle costanti senza etichetta, filtri con solo placeholder, pulsante 🗑 senza nome, `#999` su bianco (2,8:1) | E (axe) |

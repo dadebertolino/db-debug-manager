@@ -115,26 +115,47 @@ class DBDM_Snapshots {
         $snapshot['timestamp'] = time();
         $snapshot['created_by'] = get_current_user_id();
 
-        $all = self::get_all();
+        return self::mutate(function ($all) use ($snapshot, $trigger) {
+            // Dedup: se l'ultimo snapshot ha stato identico (e stesso trigger entro 60s), skippa.
+            if (!empty($all)) {
+                $last = $all[count($all) - 1];
+                if ($last['trigger'] === $trigger
+                    && (time() - $last['timestamp']) < 60
+                    && self::states_equal($last, $snapshot)) {
+                    return array(null, $last['id']);
+                }
+            }
+            $all[] = $snapshot;
+            return array(self::prune($all), $snapshot['id']);
+        });
+    }
 
-        // Dedup: se l'ultimo snapshot ha stato identico (e stesso trigger entro 60s), skippa.
-        if (!empty($all)) {
-            $last = $all[count($all) - 1];
-            if ($last['trigger'] === $trigger
-                && (time() - $last['timestamp']) < 60
-                && self::states_equal($last, $snapshot)) {
-                return $last['id'];
+    /**
+     * Legge, trasforma e riscrive snapshots.json sotto lock esclusivo.
+     * 2.0.0 (bug 56): due richieste insieme (snapshot manuale e
+     * aggiornamento) non perdono più uno snapshot.
+     *
+     * @param callable $fn function(array $all): array{0:array|null,1:mixed};
+     *                     null come elenco = nulla da scrivere.
+     * @return mixed Il secondo valore di $fn, WP_Error se la scrittura fallisce.
+     */
+    private static function mutate($fn) {
+        $lock = @fopen(DBDM_Emergency::private_dir() . 'snapshots.lock', 'c');
+        if ($lock) {
+            flock($lock, LOCK_EX);
+        }
+        try {
+            list($all, $result) = $fn(self::get_all());
+            if ($all !== null && !self::write_all($all)) {
+                $result = new WP_Error('dbdm_snap_write_fail', __('Impossibile scrivere file snapshot.', 'db-debug-manager'));
+            }
+        } finally {
+            if ($lock) {
+                flock($lock, LOCK_UN);
+                fclose($lock);
             }
         }
-
-        $all[] = $snapshot;
-
-        $all = self::prune($all);
-
-        if (!self::write_all($all)) {
-            return new WP_Error('dbdm_snap_write_fail', __('Impossibile scrivere file snapshot.', 'db-debug-manager'));
-        }
-        return $snapshot['id'];
+        return $result;
     }
 
     /**
@@ -248,15 +269,18 @@ class DBDM_Snapshots {
     }
 
     public static function delete($id) {
-        $all = self::get_all();
-        $filtered = array_values(array_filter($all, function ($s) use ($id) {
- return $s['id'] !== $id;
-}));
-        return self::write_all($filtered);
+        return self::mutate(function ($all) use ($id) {
+            $filtered = array_values(array_filter($all, function ($s) use ($id) {
+                return !isset($s['id']) || $s['id'] !== $id;
+            }));
+            return array($filtered, true);
+        }) === true;
     }
 
     public static function delete_all() {
-        return self::write_all(array());
+        return self::mutate(function () {
+            return array(array(), true);
+        }) === true;
     }
 
     /**

@@ -3,7 +3,7 @@
  * Fase 2 su WordPress vero: snapshot prima degli aggiornamenti (bug 45),
  * ripristino dei plugin con gli hook del core e plugin di rete (bug 46, 47),
  * monitor query solo per l'amministratore che lo attiva (bug 49),
- * disinstallazione (bug 51).
+ * disinstallazione (bug 51), token della cartella privata concorrente (bug 55).
  *
  * @package DBDM\Tests\Integration
  */
@@ -236,6 +236,34 @@ class Phase2IntegrationTest extends WP_UnitTestCase {
 		add_filter( 'wp_doing_ajax', '__return_true' );
 		$this->assertFalse( $this->run_capture(), 'AJAX' );
 		remove_filter( 'wp_doing_ajax', '__return_true' );
+	}
+
+	/* --- Token della cartella privata (bug 55) ---------------------------- */
+
+	public function test_token_creato_da_un_altra_richiesta_nel_frattempo(): void {
+		global $wpdb;
+		delete_option( DBDM_Emergency::OPTION_DIR_TOKEN );
+		// Un'altra richiesta scrive il token dopo che questa l'ha letto vuoto.
+		$wpdb->insert( $wpdb->options, array( 'option_name' => DBDM_Emergency::OPTION_DIR_TOKEN, 'option_value' => 'abcdef0123456789', 'autoload' => 'no' ) );
+		$stale = function () {
+			return '';
+		};
+		add_filter( 'pre_option_' . DBDM_Emergency::OPTION_DIR_TOKEN, $stale );
+		// add_option() controlla se l'opzione esiste: da lì in poi la lettura
+		// non è più quella vecchia.
+		add_filter(
+			'default_option_' . DBDM_Emergency::OPTION_DIR_TOKEN,
+			function ( $default ) use ( $stale ) {
+				remove_filter( 'pre_option_' . DBDM_Emergency::OPTION_DIR_TOKEN, $stale );
+				return $default;
+			}
+		);
+
+		$dir = DBDM_Emergency::private_dir();
+
+		$this->assertSame( WP_CONTENT_DIR . '/dbdm-private-abcdef0123456789/', $dir, 'vale il token già scritto' );
+		$this->assertSame( 'abcdef0123456789', get_option( DBDM_Emergency::OPTION_DIR_TOKEN ) );
+		DBDM_Uninstall::run();
 	}
 
 	/* --- Disinstallazione (bug 51) ----------------------------------------- */

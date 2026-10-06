@@ -88,4 +88,35 @@ class SnapshotsTest extends TestCase {
 		$this->assertFalse( dbdm_test_call_private( 'DBDM_Snapshots', 'states_equal', array( $a, $b ) ) );
 		$this->assertTrue( DBDM_Snapshots::diff_is_empty( DBDM_Snapshots::diff( $this->state(), $this->state() ) ), 'snapshot senza network_plugins (precedenti alla 2.0.0)' );
 	}
+
+	/**
+	 * Bug 56: lettura-modifica-scrittura di snapshots.json sotto lock, così
+	 * due richieste insieme non perdono uno snapshot.
+	 */
+	public function test_modifica_degli_snapshot_sotto_lock(): void {
+		$lock = DBDM_Emergency::private_dir() . 'snapshots.lock';
+		$held = null;
+
+		$result = dbdm_test_call_private(
+			'DBDM_Snapshots',
+			'mutate',
+			array(
+				function ( $all ) use ( $lock, &$held ) {
+					$fp   = fopen( $lock, 'c' );
+					$held = ! flock( $fp, LOCK_EX | LOCK_NB );
+					fclose( $fp );
+					$all[] = array( 'id' => 'x', 'trigger' => 'manual' );
+					return array( $all, 'fatto' );
+				},
+			)
+		);
+
+		$this->assertTrue( $held, 'lock tenuto durante la modifica' );
+		$this->assertSame( 'fatto', $result );
+		$this->assertSame( array( 'x' ), array_column( DBDM_Snapshots::get_all(), 'id' ) );
+
+		$fp = fopen( $lock, 'c' );
+		$this->assertTrue( flock( $fp, LOCK_EX | LOCK_NB ), 'lock rilasciato' );
+		fclose( $fp );
+	}
 }

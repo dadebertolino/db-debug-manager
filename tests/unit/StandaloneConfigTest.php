@@ -399,4 +399,15 @@ class StandaloneConfigTest extends TestCase {
 
 		$this->assertFalse( DBDM_Standalone_Config::find_wp_config( "$root/wp/wp-content/plugins/db-debug-manager" ) );
 	}
+
+	/**
+	 * Bug 55: con WP-CLI lanciato da root i file creati appartenevano a
+	 * root e il server web non poteva più scriverli.
+	 */
+	public function test_proprietario_da_ripristinare_solo_se_root(): void {
+		$this->assertSame( 33, DBDM_Standalone_Config::owner_to_restore( 0, 0, 33 ), 'root crea, cartella di www-data' );
+		$this->assertNull( DBDM_Standalone_Config::owner_to_restore( 0, 33, 33 ), 'già giusto' );
+		$this->assertNull( DBDM_Standalone_Config::owner_to_restore( 33, 33, 0 ), 'non root: nulla da fare' );
+		$this->assertNull( DBDM_Standalone_Config::owner_to_restore( 0, 0, false ), 'proprietario sconosciuto' );
+	}
 }
