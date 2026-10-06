@@ -79,13 +79,13 @@ if (!$dbdm_is_apache):
             <?php wp_nonce_field('dbdm_save_emergency'); ?>
 
             <p>
-                <label>
+                <label for="dbdm-em-password">
                     <strong><?php esc_html_e('Nuova password', 'db-debug-manager'); ?></strong>
                     <?php if ($has_pwd): ?>
                         <span class="db-ui-text-muted"> — <?php esc_html_e('lascia vuoto per mantenere l\'attuale', 'db-debug-manager'); ?></span>
                     <?php endif; ?>
                 </label><br>
-                <input type="password" name="dbdm_password" autocomplete="new-password" style="width:320px;" minlength="12" <?php echo $has_pwd ? '' : 'required'; ?>>
+                <input type="password" id="dbdm-em-password" name="dbdm_password" autocomplete="new-password" style="width:320px;" minlength="12" <?php echo $has_pwd ? '' : 'required'; ?>>
             </p>
             <p class="description" style="color:var(--db-text-muted); font-size:12px;">
                 <?php esc_html_e('Minimo 12 caratteri, con maiuscole, minuscole e numeri. Salvata come hash bcrypt.', 'db-debug-manager'); ?>

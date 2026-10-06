@@ -161,6 +161,7 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Accessibilità (WCAG 2.1 AA, verificata con axe-core):** etichette per le costanti, la password e i filtri, nome al pulsante di eliminazione degli snapshot, contrasti corretti nel pannello e nell'emergency.
 - **Traduzioni:** dominio caricato da `languages/` (`Domain Path`), catalogo `languages/db-debug-manager.pot` (rigenerabile con `bin/make-pot.sh`), etichette degli snapshot traducibili. `emergency.php` gira senza WordPress e resta in italiano.
 - **Fix: "Aggiorna" e l'auto-refresh del log mostravano sempre il contenuto di quando la pagina era stata caricata.** Ora mostrano le righe nuove, anche con un filtro attivo; il viewer c'è anche se il log nasce dopo, e una sessione scaduta viene segnalata.
 - **Fix: un byte non UTF-8 rendeva vuoti il viewer del log e la tab Query.**

@@ -156,4 +156,20 @@ jobs:
   e2e:
     name: E2E (wp-env + Playwright)
     needs: [ lint, phpcs, unit ]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Configurazione di .wp-env.json.
+          - label: ci
+            core: ''
+            php: ''
+          # Requisito minimo dichiarato (Requires at least: 6.0).
+          - label: wp-6.0
+            core: 'WordPress/WordPress#6.0'
+            php: '8.1'
     uses: ./.github/workflows/e2e.yml
+    with:
+      core: ${{ matrix.core }}
+      php: ${{ matrix.php }}
+      label: ${{ matrix.label }}
