@@ -6,7 +6,7 @@
  */
 if (!defined('ABSPATH')) exit;
 
-$base_url = admin_url('tools.php?page=' . DBDM_SLUG);
+$base_url = DBDM_Admin::page_url();
 ?>
 <div class="wrap dbdm-wrap">
 

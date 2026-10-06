@@ -17,8 +17,26 @@ class DBDM_Admin {
         return self::$instance;
     }
 
+    /**
+     * Capability richiesta: in multisite wp-config.php e debug.log sono della
+     * rete intera, quindi solo i super admin (1.4.0).
+     */
+    public static function cap() {
+        return is_multisite() ? 'manage_network_options' : 'manage_options';
+    }
+
+    /**
+     * URL della pagina del plugin (bacheca di rete in multisite).
+     *
+     * @param array $args Argomenti della query (tab, messaggi…).
+     */
+    public static function page_url($args = array()) {
+        $base = is_multisite() ? network_admin_url('settings.php') : admin_url('tools.php');
+        return add_query_arg(array_merge(array('page' => DBDM_SLUG), $args), $base);
+    }
+
     private function __construct() {
-        add_action('admin_menu', array($this, 'register_menu'));
+        add_action(is_multisite() ? 'network_admin_menu' : 'admin_menu', array($this, 'register_menu'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_assets'));
         add_action('admin_post_dbdm_save_constants', array($this, 'handle_save_constants'));
         add_action('admin_post_dbdm_clear_log', array($this, 'handle_clear_log'));
@@ -33,10 +51,21 @@ class DBDM_Admin {
     }
 
     public function register_menu() {
+        if (is_multisite()) {
+            $this->hook_suffix = add_submenu_page(
+                'settings.php',
+                __('DB Debug Manager', 'db-debug-manager'),
+                __('Debug Manager', 'db-debug-manager'),
+                self::cap(),
+                DBDM_SLUG,
+                array($this, 'render_page')
+            );
+            return;
+        }
         $this->hook_suffix = add_management_page(
             __('DB Debug Manager', 'db-debug-manager'),
             __('Debug Manager', 'db-debug-manager'),
-            'manage_options',
+            self::cap(),
             DBDM_SLUG,
             array($this, 'render_page')
         );
@@ -64,7 +93,7 @@ class DBDM_Admin {
      * Render pagina principale.
      */
     public function render_page() {
-        if (!current_user_can('manage_options')) return;
+        if (!current_user_can(self::cap())) return;
 
         // Migrazione: elimina il backup legacy esposto nella webroot (<= 1.2.0).
         DBDM_Config::cleanup_legacy_backup();
@@ -89,72 +118,84 @@ class DBDM_Admin {
      * Salva modifiche costanti.
      */
     public function handle_save_constants() {
-        if (!current_user_can('manage_options')) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
+        if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
         check_admin_referer('dbdm_save_constants');
 
         $posted = isset($_POST['dbdm']) && is_array($_POST['dbdm']) ? array_map('sanitize_text_field', wp_unslash($_POST['dbdm'])) : array();
-        $errors = array();
+        $result = DBDM_Config::set_constants(self::constants_to_write($posted));
+        $errors = is_wp_error($result) ? array($result->get_error_message()) : array();
 
-        foreach (DBDM_Config::MANAGED as $const) {
-            $value = !empty($posted[$const]) ? true : false;
-
-            // WP_DEBUG_LOG può essere un path custom (stringa): va preservato.
-            if ($const === 'WP_DEBUG_LOG') {
-                $current = defined('WP_DEBUG_LOG') ? WP_DEBUG_LOG : null;
-                $has_custom_path = is_string($current) && $current !== '';
-
-                if ($value && $has_custom_path) {
-                    continue; // già attiva con path custom: non toccare.
-                }
-                if (!$value && $has_custom_path) {
-                    // Disattivazione: memorizza il path per la riattivazione.
-                    update_option('dbdm_debug_log_path', $current, false);
-                }
-                if ($value && !$has_custom_path) {
-                    // Riattivazione: ripristina l'eventuale path memorizzato.
-                    $saved = get_option('dbdm_debug_log_path', '');
-                    if (is_string($saved) && $saved !== '') {
-                        $value = $saved;
-                    }
-                }
-            }
-
-            $result = DBDM_Config::set_constant($const, $value);
-            if (is_wp_error($result)) {
-                $errors[] = $const . ': ' . $result->get_error_message();
-            }
-        }
-
-        $redirect = add_query_arg(array(
-            'page'    => DBDM_SLUG,
+        $redirect = self::page_url(array(
             'tab'     => 'config',
             'updated' => empty($errors) ? '1' : '0',
             'err'     => !empty($errors) ? rawurlencode(implode(' | ', $errors)) : null,
-        ), admin_url('tools.php'));
+        ));
 
         wp_safe_redirect($redirect);
         exit;
     }
 
+    /**
+     * Costanti da scrivere per il form inviato: solo quelle il cui stato
+     * cambia rispetto a quello attuale (1.4.0: prima venivano scritte tutte,
+     * compresa WP_DEBUG_DISPLAY attiva di default).
+     *
+     * WP_DEBUG_LOG (1.4.0): attivandolo il log va nella cartella privata,
+     * non in wp-content/debug.log raggiungibile da chiunque; un percorso
+     * personalizzato già impostato viene rispettato e, disattivando, ricordato
+     * per la riattivazione.
+     *
+     * @param array $posted Checkbox inviate (nome => '1').
+     * @return array<string,mixed>
+     */
+    public static function constants_to_write($posted) {
+        $out = array();
+        foreach (DBDM_Config::MANAGED as $const) {
+            $want    = !empty($posted[$const]);
+            $current = defined($const) ? constant($const) : null;
+
+            if ($const === 'WP_DEBUG_LOG') {
+                $path   = DBDM_Log::resolve_path($current);
+                $custom = $current && wp_normalize_path($path) !== wp_normalize_path(DBDM_Log::public_path());
+                if ($want) {
+                    if ($custom) continue; // Già attivo su un percorso non pubblico.
+                    $saved = get_option('dbdm_debug_log_path', '');
+                    $saved_ok = is_string($saved) && $saved !== '' && wp_normalize_path(DBDM_Log::resolve_path($saved)) !== wp_normalize_path(DBDM_Log::public_path());
+                    $out[$const] = $saved_ok ? $saved : DBDM_Log::private_path();
+                } elseif ($current) {
+                    if ($custom) {
+                        update_option('dbdm_debug_log_path', $path, false);
+                    }
+                    $out[$const] = false;
+                }
+                continue;
+            }
+
+            if ($want !== (bool) $current) {
+                $out[$const] = $want;
+            }
+        }
+        return $out;
+    }
+
     public function handle_clear_log() {
-        if (!current_user_can('manage_options')) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
+        if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
         check_admin_referer('dbdm_clear_log');
 
         $result = DBDM_Log::clear();
         $args = array(
-            'page'    => DBDM_SLUG,
             'tab'     => 'log',
             'cleared' => is_wp_error($result) ? '0' : '1',
         );
         if (is_wp_error($result)) {
             $args['err'] = rawurlencode($result->get_error_message());
         }
-        wp_safe_redirect(add_query_arg($args, admin_url('tools.php')));
+        wp_safe_redirect(self::page_url($args));
         exit;
     }
 
     public function handle_download_log() {
-        if (!current_user_can('manage_options')) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
+        if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
         check_admin_referer('dbdm_download_log');
 
         $path = DBDM_Log::get_path();
@@ -175,7 +216,7 @@ class DBDM_Admin {
      */
     public function ajax_refresh_log() {
         check_ajax_referer('dbdm_nonce', 'nonce');
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can(self::cap())) {
             wp_send_json_error(array('message' => __('Permessi insufficienti.', 'db-debug-manager')), 403);
         }
         $lines = isset($_POST['lines']) ? (int) $_POST['lines'] : 500;
@@ -192,7 +233,7 @@ class DBDM_Admin {
      * Salva password + attivazione emergency.
      */
     public function handle_save_emergency() {
-        if (!current_user_can('manage_options')) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
+        if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
         check_admin_referer('dbdm_save_emergency');
 
         $errors = array();
@@ -200,11 +241,10 @@ class DBDM_Admin {
         // Rimozione totale.
         if (isset($_POST['dbdm_action']) && $_POST['dbdm_action'] === 'clear') {
             DBDM_Emergency::clear_password();
-            wp_safe_redirect(add_query_arg(array(
-                'page' => DBDM_SLUG,
+            wp_safe_redirect(self::page_url(array(
                 'tab'  => 'emergency',
                 'em_cleared' => '1',
-            ), admin_url('tools.php')));
+            )));
             exit;
         }
 
@@ -230,61 +270,59 @@ class DBDM_Admin {
         DBDM_Emergency::set_trust_proxy(!empty($_POST['dbdm_trust_proxy']));
 
         $args = array(
-            'page' => DBDM_SLUG,
             'tab'  => 'emergency',
             'em_saved' => empty($errors) ? '1' : '0',
         );
         if (!empty($errors)) {
             $args['err'] = rawurlencode(implode(' | ', $errors));
         }
-        wp_safe_redirect(add_query_arg($args, admin_url('tools.php')));
+        wp_safe_redirect(self::page_url($args));
         exit;
     }
 
     public function handle_clear_emergency_log() {
-        if (!current_user_can('manage_options')) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
+        if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
         check_admin_referer('dbdm_clear_emergency_log');
         DBDM_Emergency::clear_log();
-        wp_safe_redirect(add_query_arg(array(
-            'page' => DBDM_SLUG,
+        wp_safe_redirect(self::page_url(array(
             'tab'  => 'emergency',
             'em_log_cleared' => '1',
-        ), admin_url('tools.php')));
+        )));
         exit;
     }
 
     public function handle_create_snapshot() {
-        if (!current_user_can('manage_options')) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
+        if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
         check_admin_referer('dbdm_create_snapshot');
 
         $note = isset($_POST['note']) ? sanitize_text_field(wp_unslash($_POST['note'])) : '';
         $id = DBDM_Snapshots::create(DBDM_Snapshots::TRIGGER_MANUAL, $note);
 
-        $args = array('page' => DBDM_SLUG, 'tab' => 'snapshots');
+        $args = array('tab' => 'snapshots');
         if (is_wp_error($id)) {
             $args['snap_err'] = rawurlencode($id->get_error_message());
         } else {
             $args['snap_created'] = '1';
         }
-        wp_safe_redirect(add_query_arg($args, admin_url('tools.php')));
+        wp_safe_redirect(self::page_url($args));
         exit;
     }
 
     public function handle_delete_snapshot() {
-        if (!current_user_can('manage_options')) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
+        if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
         check_admin_referer('dbdm_delete_snapshot');
 
         $id = isset($_POST['id']) ? sanitize_text_field(wp_unslash($_POST['id'])) : '';
         if ($id) DBDM_Snapshots::delete($id);
 
-        wp_safe_redirect(add_query_arg(array(
-            'page' => DBDM_SLUG, 'tab' => 'snapshots', 'snap_deleted' => '1',
-        ), admin_url('tools.php')));
+        wp_safe_redirect(self::page_url(array(
+            'tab' => 'snapshots', 'snap_deleted' => '1',
+        )));
         exit;
     }
 
     public function handle_restore_snapshot() {
-        if (!current_user_can('manage_options')) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
+        if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
         check_admin_referer('dbdm_restore_snapshot');
 
         $id = isset($_POST['id']) ? sanitize_text_field(wp_unslash($_POST['id'])) : '';
@@ -293,10 +331,10 @@ class DBDM_Admin {
         if (!empty($_POST['restore_theme']))   $parts[] = 'theme';
 
         if (!$id || empty($parts)) {
-            wp_safe_redirect(add_query_arg(array(
-                'page' => DBDM_SLUG, 'tab' => 'snapshots',
+            wp_safe_redirect(self::page_url(array(
+                'tab' => 'snapshots',
                 'snap_err' => rawurlencode(__('Seleziona almeno una parte da ripristinare.', 'db-debug-manager')),
-            ), admin_url('tools.php')));
+            )));
             exit;
         }
 
@@ -304,19 +342,19 @@ class DBDM_Admin {
         // Passa i messaggi via transient (evita URL lunghi).
         set_transient('dbdm_restore_msgs_' . get_current_user_id(), $messages, 60);
 
-        wp_safe_redirect(add_query_arg(array(
-            'page' => DBDM_SLUG, 'tab' => 'snapshots', 'snap_restored' => '1',
-        ), admin_url('tools.php')));
+        wp_safe_redirect(self::page_url(array(
+            'tab' => 'snapshots', 'snap_restored' => '1',
+        )));
         exit;
     }
 
     public function handle_clear_snapshots() {
-        if (!current_user_can('manage_options')) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
+        if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
         check_admin_referer('dbdm_clear_snapshots');
         DBDM_Snapshots::delete_all();
-        wp_safe_redirect(add_query_arg(array(
-            'page' => DBDM_SLUG, 'tab' => 'snapshots', 'snap_cleared' => '1',
-        ), admin_url('tools.php')));
+        wp_safe_redirect(self::page_url(array(
+            'tab' => 'snapshots', 'snap_cleared' => '1',
+        )));
         exit;
     }
 }

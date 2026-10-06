@@ -33,6 +33,20 @@ const DBDM_E2E_CONSTANTS  = array( 'WP_DEBUG', 'WP_DEBUG_LOG', 'WP_DEBUG_DISPLAY
 /**
  * Costanti di debug della richiesta corrente, per la lettura "dall'esterno".
  */
+/**
+ * Un avviso PHP su richiesta: finisce nel debug.log attivo (per verificare
+ * dove WordPress scrive il log).
+ */
+if ( isset( $_GET['dbdm_e2e_notice'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	add_action(
+		'init',
+		function () {
+			trigger_error( 'DBDM E2E avviso di prova', E_USER_NOTICE ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_trigger_error
+			exit( 'ok' );
+		}
+	);
+}
+
 if ( isset( $_GET['dbdm_e2e_constants'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	$dbdm_e2e_values = array();
 	foreach ( DBDM_E2E_CONSTANTS as $dbdm_e2e_name ) {
@@ -78,7 +92,10 @@ function dbdm_e2e_golden() {
  * Varianti di wp-config.php ricavate dalla copia dorata.
  *
  *  - golden:  come l'ha scritto wp-env (credenziali con getenv_docker);
- *  - literal: credenziali scritte come stringhe, come su un hosting comune.
+ *  - literal: credenziali scritte come stringhe, come su un hosting comune;
+ *  - hosting: define con commento in coda, define condizionale, blocco
+ *             commentato con define (bug 1 e 4 del piano);
+ *  - public_log: WP_DEBUG e WP_DEBUG_LOG = true (log in wp-content).
  *
  * Le varianti del corpus (commenti, condizionali, CRLF…) si aggiungono qui
  * nelle fasi successive.
@@ -103,6 +120,18 @@ function dbdm_e2e_wp_config( $variant ) {
 			return preg_replace(
 				'/\$table_prefix\s*=\s*getenv_docker\(.*\);/',
 				'$table_prefix = ' . var_export( $table_prefix, true ) . ';',
+				$golden
+			);
+		case 'public_log':
+			// Sito con il log pubblico di WordPress (wp-content/debug.log).
+			$golden = preg_replace( "/define\(\s*'WP_DEBUG',\s*false\s*\);/", "define( 'WP_DEBUG', true );", $golden, 1 );
+			return preg_replace( "/define\(\s*'WP_DEBUG_LOG',\s*false\s*\);/", "define( 'WP_DEBUG_LOG', true );", $golden, 1 );
+		case 'hosting':
+			$golden = preg_replace( "/define\(\s*'WP_DEBUG',\s*false\s*\);/", "define( 'WP_DEBUG', false ); // impostato dall'hosting", $golden, 1 );
+			$golden = preg_replace( "/define\(\s*'SCRIPT_DEBUG',\s*false\s*\);/", "defined( 'SCRIPT_DEBUG' ) || define( 'SCRIPT_DEBUG', false );", $golden, 1 );
+			return str_replace(
+				"/* That's all, stop editing!",
+				"/* define( 'WP_DEBUG', true );\n   define( 'SAVEQUERIES', true ); */\n\n/* That's all, stop editing!",
 				$golden
 			);
 	}
@@ -147,6 +176,10 @@ function dbdm_e2e_rmdir( $dir ) {
  *               DBDM_E2E_PASSWORD, abilitato, token della cartella privata
  *               fisso. Come array accetta `password`, `enabled`, `trust_proxy`.
  *  - log        string  Contenuto iniziale di debug.log (default: assente).
+ *  - snapshots  array   Contenuto di snapshots.json nella cartella privata
+ *               (richiede emergency, che la crea).
+ *  - themes     string[] Temi di prova da creare: 'orfano' (child theme il
+ *               cui padre non esiste). Rimossi a ogni reset.
  *
  * @param array $args
  * @return array|WP_Error Stato risultante (vedi dbdm_e2e_state()).
@@ -164,6 +197,9 @@ function dbdm_e2e_reset( $args = array() ) {
 	}
 	if ( false === file_put_contents( $paths['config'], $config ) ) {
 		return new WP_Error( 'dbdm_e2e_config', 'wp-config.php non scrivibile dal server web.', array( 'status' => 500 ) );
+	}
+	if ( function_exists( 'opcache_invalidate' ) ) {
+		opcache_invalidate( $paths['config'], true );
 	}
 
 	// Opzioni e transient del plugin (anche quelli dell'updater).
@@ -188,6 +224,21 @@ function dbdm_e2e_reset( $args = array() ) {
 		dbdm_e2e_rmdir( $dir );
 	}
 
+	// Plugin attivo (uno spec può averlo disattivato).
+	require_once ABSPATH . 'wp-admin/includes/plugin.php';
+	if ( ! is_plugin_active( 'db-debug-manager/db-debug-manager.php' ) ) {
+		activate_plugin( 'db-debug-manager/db-debug-manager.php' );
+	}
+
+	// Temi di prova.
+	foreach ( glob( get_theme_root() . '/dbdm-e2e-*', GLOB_ONLYDIR ) ?: array() as $dir ) {
+		dbdm_e2e_rmdir( $dir );
+	}
+	if ( isset( $args['themes'] ) && in_array( 'orfano', (array) $args['themes'], true ) ) {
+		wp_mkdir_p( get_theme_root() . '/dbdm-e2e-orfano' );
+		file_put_contents( get_theme_root() . '/dbdm-e2e-orfano/style.css', "/*\nTheme Name: DBDM E2E Orfano\nTemplate: dbdm-e2e-padre-cancellato\n*/\n" );
+	}
+
 	// Accesso d'emergenza.
 	if ( ! empty( $args['emergency'] ) ) {
 		$em = is_array( $args['emergency'] ) ? $args['emergency'] : array();
@@ -195,6 +246,12 @@ function dbdm_e2e_reset( $args = array() ) {
 		update_option( 'dbdm_emergency_hash', password_hash( isset( $em['password'] ) ? (string) $em['password'] : DBDM_E2E_PASSWORD, PASSWORD_DEFAULT ), false );
 		update_option( 'dbdm_emergency_enabled', array_key_exists( 'enabled', $em ) ? ( $em['enabled'] ? '1' : '0' ) : '1', false );
 		update_option( 'dbdm_emergency_trust_proxy', ! empty( $em['trust_proxy'] ) ? '1' : '0', false );
+		update_option( 'dbdm_emergency_epoch', 'e2e-' . wp_rand(), false );
+		// Crea la cartella privata (e ne salva il percorso) come il pannello.
+		$private = DBDM_Emergency::private_dir();
+		if ( isset( $args['snapshots'] ) && is_array( $args['snapshots'] ) ) {
+			file_put_contents( $private . 'snapshots.json', wp_json_encode( $args['snapshots'] ) );
+		}
 	}
 
 	return dbdm_e2e_state();
@@ -231,6 +288,7 @@ function dbdm_e2e_effective_constants() {
  */
 function dbdm_e2e_state() {
 	global $wpdb;
+	require_once ABSPATH . 'wp-admin/includes/plugin.php';
 	$paths = dbdm_e2e_paths();
 
 	$private = array();
@@ -247,8 +305,15 @@ function dbdm_e2e_state() {
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 	$options = $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'dbdm\\_%'", OBJECT_K );
 
+	$private_dir = (string) get_option( 'dbdm_private_dir_path', '' );
+	$backup      = $private_dir ? $private_dir . '/wp-config.dbdm-bak' : '';
+
 	return array(
 		'wp_config'          => (string) file_get_contents( $paths['config'] ),
+		'golden_sha1'        => file_exists( $paths['golden'] ) ? sha1_file( $paths['golden'] ) : null,
+		'backup_sha1'        => $backup && file_exists( $backup ) ? sha1_file( $backup ) : null,
+		'private_dir'        => $private_dir ? str_replace( WP_CONTENT_DIR, 'wp-content', $private_dir ) : '',
+		'plugin_active'      => is_plugin_active( 'db-debug-manager/db-debug-manager.php' ),
 		'wp_config_writable' => is_writable( $paths['config'] ),
 		'plugin_writable'    => is_writable( $paths['plugin'] ),
 		'content_writable'   => is_writable( WP_CONTENT_DIR ),
@@ -283,6 +348,44 @@ add_action(
 				'permission_callback' => '__return_true',
 				'callback'            => function ( WP_REST_Request $request ) {
 					return rest_ensure_response( dbdm_e2e_reset( (array) $request->get_json_params() ) );
+				},
+			)
+		);
+		// Cambio password dell'emergency come dal pannello (nuova epoca).
+		register_rest_route(
+			'dbdm-e2e/v1',
+			'/emergency-password',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => '__return_true',
+				'callback'            => function ( WP_REST_Request $request ) {
+					$result = DBDM_Emergency::set_password( (string) $request->get_param( 'password' ) );
+					if ( null !== $request->get_param( 'enabled' ) ) {
+						DBDM_Emergency::set_enabled( (bool) $request->get_param( 'enabled' ) );
+					}
+					// Come dopo un aggiornamento via FTP: cartella privata mai creata.
+					if ( $request->get_param( 'drop_private' ) ) {
+						foreach ( dbdm_e2e_private_dirs() as $dir ) {
+							dbdm_e2e_rmdir( $dir );
+						}
+						delete_option( 'dbdm_private_dir_path' );
+						delete_option( 'dbdm_private_dir_token' );
+					}
+					return rest_ensure_response( $result );
+				},
+			)
+		);
+		// Disattivazione del plugin come dalla pagina Plugin (hook compresi).
+		register_rest_route(
+			'dbdm-e2e/v1',
+			'/deactivate',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => '__return_true',
+				'callback'            => function () {
+					require_once ABSPATH . 'wp-admin/includes/plugin.php';
+					deactivate_plugins( 'db-debug-manager/db-debug-manager.php' );
+					return rest_ensure_response( dbdm_e2e_state() );
 				},
 			)
 		);

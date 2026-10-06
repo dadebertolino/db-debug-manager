@@ -70,7 +70,7 @@ class InfraTest extends TestCase {
 
 		$out = DBDM_Standalone_Config::replace_or_insert_constant( $this->corpus( 'standard' ), 'WP_DEBUG', 'true' );
 		$this->assertTrue( $this->parses( $out ) );
-		$this->assertStringContainsString( "define('WP_DEBUG', true);", $out );
+		$this->assertStringContainsString( "define( 'WP_DEBUG', true );", $out );
 
 		unlink( $dir . '/wp-config.php' );
 		rmdir( $dir );

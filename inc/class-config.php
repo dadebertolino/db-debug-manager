@@ -64,9 +64,26 @@ class DBDM_Config {
      * @return true|WP_Error
      */
     public static function set_constant($name, $value) {
-        if (!in_array($name, self::MANAGED, true)) {
-            return new WP_Error('dbdm_invalid_const', sprintf(__('Costante non gestita: %s', 'db-debug-manager'), $name));
+        return self::set_constants(array($name => $value));
+    }
+
+    /**
+     * Imposta più costanti con un'unica scrittura di wp-config.php e un
+     * unico backup dello stato precedente (1.4.0). Se il backup non riesce
+     * non viene scritto nulla.
+     *
+     * @param array<string,mixed> $values nome => true|false|stringa.
+     * @return true|WP_Error
+     */
+    public static function set_constants(array $values) {
+        $source = array();
+        foreach ($values as $name => $value) {
+            if (!in_array($name, self::MANAGED, true)) {
+                return new WP_Error('dbdm_invalid_const', sprintf(__('Costante non gestita: %s', 'db-debug-manager'), $name));
+            }
+            $source[$name] = self::format_value($value);
         }
+        if (!$source) return true;
 
         $path = self::get_config_path();
         if (!$path) {
@@ -76,41 +93,18 @@ class DBDM_Config {
             return new WP_Error('dbdm_not_writable', __('wp-config.php non è scrivibile. Controlla i permessi del file.', 'db-debug-manager'));
         }
 
-        $contents = file_get_contents($path);
-        if ($contents === false) {
-            return new WP_Error('dbdm_read_fail', __('Impossibile leggere wp-config.php.', 'db-debug-manager'));
-        }
-
-        // Backup prima di ogni modifica, nella cartella private/ del plugin
-        // (deny-all via .htaccess): mai accanto a wp-config.php, dove sarebbe
-        // servito come testo semplice esponendo le credenziali DB.
-        @copy($path, self::backup_path());
+        // Backup nella cartella privata (mai accanto a wp-config.php, dove
+        // sarebbe servito come testo semplice esponendo le credenziali DB).
+        $result = DBDM_Standalone_Config::set_constants($path, $source, self::backup_path());
         self::cleanup_legacy_backup();
-
-        $new_contents = DBDM_Standalone_Config::replace_or_insert_constant(
-            $contents, $name, self::format_value($value)
-        );
-
-        if ($new_contents === $contents) {
-            // Nessuna modifica necessaria.
-            return true;
+        if ($result !== true) {
+            return new WP_Error('dbdm_write_fail', $result);
         }
-
-        // Validazione sintattica prima di salvare (logica condivisa).
-        $check = DBDM_Standalone_Config::php_lint_string($new_contents);
-        if ($check !== true) {
-            return new WP_Error('dbdm_syntax_error', __('Errore di sintassi rilevato. Modifica annullata.', 'db-debug-manager'));
-        }
-
-        if (file_put_contents($path, $new_contents) === false) {
-            return new WP_Error('dbdm_write_fail', __('Impossibile scrivere wp-config.php.', 'db-debug-manager'));
-        }
-
         return true;
     }
 
     /**
-     * Path del backup di wp-config.php dentro private/.
+     * Path del backup di wp-config.php nella cartella privata.
      */
     public static function backup_path() {
         return DBDM_Emergency::private_dir() . 'wp-config.dbdm-bak';
@@ -136,9 +130,10 @@ class DBDM_Config {
             $b = is_bool($value) ? $value : ($value === 'true');
             return $b ? 'true' : 'false';
         }
-        if (is_numeric($value)) {
+        if (is_int($value) || is_float($value)) {
             return (string) $value;
         }
-        return "'" . addslashes((string) $value) . "'";
+        // Letterale PHP corretto (apici singoli, solo \' e \\ come escape).
+        return var_export((string) $value, true);
     }
 }

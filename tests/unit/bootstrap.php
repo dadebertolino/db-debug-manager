@@ -473,6 +473,47 @@ function dbdm_test_add_post( $id, array $fields = array() ) {
 	return $post;
 }
 
+/* --- Percorsi e multisite ------------------------------------------------- */
+
+// wp-content temporaneo per questo processo (cartella privata, snapshot).
+if ( ! defined( 'WP_CONTENT_DIR' ) ) {
+	define( 'WP_CONTENT_DIR', sys_get_temp_dir() . '/dbdm-unit-content-' . getmypid() );
+}
+if ( ! is_dir( WP_CONTENT_DIR ) ) {
+	mkdir( WP_CONTENT_DIR, 0755, true );
+}
+register_shutdown_function(
+	function () {
+		$rm = function ( $dir ) use ( &$rm ) {
+			foreach ( array_diff( (array) scandir( $dir ), array( '.', '..' ) ) as $item ) {
+				is_dir( "$dir/$item" ) ? $rm( "$dir/$item" ) : unlink( "$dir/$item" );
+			}
+			rmdir( $dir );
+		};
+		if ( is_dir( WP_CONTENT_DIR ) ) {
+			$rm( WP_CONTENT_DIR );
+		}
+	}
+);
+
+$GLOBALS['__dbdm_multisite'] = false;
+
+if ( ! function_exists( 'is_multisite' ) ) {
+	function is_multisite() {
+		return ! empty( $GLOBALS['__dbdm_multisite'] );
+	}
+}
+if ( ! function_exists( 'wp_normalize_path' ) ) {
+	function wp_normalize_path( $path ) {
+		return preg_replace( '|(?<=.)/+|', '/', str_replace( '\\', '/', (string) $path ) );
+	}
+}
+if ( ! function_exists( 'size_format' ) ) {
+	function size_format( $bytes, $decimals = 0 ) {
+		return $bytes . ' B';
+	}
+}
+
 /* -----------------------------------------------------------------------------
  * Helper per i test.
  * -------------------------------------------------------------------------- */
@@ -487,6 +528,7 @@ function dbdm_test_reset() {
 	$GLOBALS['__dbdm_filters']        = array();
 	$GLOBALS['__dbdm_doing_it_wrong'] = array();
 	$GLOBALS['__dbdm_is_admin']       = false;
+	$GLOBALS['__dbdm_multisite']      = false;
 	$GLOBALS['__dbdm_posts']          = array();
 	$GLOBALS['__dbdm_post_types']     = array( 'post', 'page' );
 

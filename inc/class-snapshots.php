@@ -201,9 +201,19 @@ ksort($vb);
         return self::write_all(array());
     }
 
+    /**
+     * 1.4.0: un nome o una versione con UTF-8 non valido (header di un
+     * plugin in Latin-1) facevano fallire json_encode e la scrittura di una
+     * stringa vuota cancellava TUTTI gli snapshot. Ora i caratteri non validi
+     * vengono sostituiti, un errore non scrive nulla e la scrittura è
+     * atomica.
+     */
     private static function write_all($data) {
-        $path = self::storage_path();
-        return (bool) @file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT), LOCK_EX);
+        $json = json_encode(array_values($data), JSON_PRETTY_PRINT | JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($json === false) {
+            return false;
+        }
+        return DBDM_Standalone_Config::write_file(self::storage_path(), $json, 0640) === true;
     }
 
     /**
@@ -310,7 +320,7 @@ ksort($vb);
             $current_installed = function_exists('get_plugins') ? array_keys(get_plugins()) : $existing;
             $to_activate = array_values(array_intersect($snap['active_plugins'] ?? array(), $current_installed));
 
-            update_option('active_plugins', $to_activate, false);
+            update_option('active_plugins', $to_activate);
             $messages[] = array('ok', sprintf(
                 __('Plugin attivi ripristinati: %d.', 'db-debug-manager'),
                 count($to_activate)
@@ -326,15 +336,19 @@ ksort($vb);
         }
 
         if (in_array('theme', $parts, true)) {
-            $target = $snap['stylesheet'] ?? '';
+            $target = isset($snap['stylesheet']) && is_string($snap['stylesheet']) ? $snap['stylesheet'] : '';
             if ($target && function_exists('wp_get_theme')) {
                 $theme = wp_get_theme($target);
-                if ($theme->exists()) {
-                    update_option('stylesheet', $target, false);
-                    update_option('template', $snap['template'] ?? $target, false);
-                    $messages[] = array('ok', sprintf(__('Tema ripristinato: %s', 'db-debug-manager'), $target));
-                } else {
+                if (!$theme->exists()) {
                     $messages[] = array('err', sprintf(__('Tema non più installato: %s', 'db-debug-manager'), $target));
+                } elseif ($theme->errors() || ($theme->get_template() !== $target && !wp_get_theme($theme->get_template())->exists())) {
+                    // 1.4.0: un child theme senza padre lascerebbe il sito bianco.
+                    $messages[] = array('err', sprintf(__('Tema non ripristinato: il tema padre "%1$s" di %2$s non è installato.', 'db-debug-manager'), $theme->get_template(), $target));
+                } else {
+                    // 1.4.0: switch_theme() (padre dal tema stesso, hook del
+                    // core, autoload invariato) invece di scrivere le opzioni.
+                    switch_theme($target);
+                    $messages[] = array('ok', sprintf(__('Tema ripristinato: %s', 'db-debug-manager'), $target));
                 }
             }
         }
