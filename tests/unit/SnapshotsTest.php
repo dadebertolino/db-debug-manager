@@ -73,4 +73,19 @@ class SnapshotsTest extends TestCase {
 		$this->assertFalse( $equal( $this->state(), $this->state( array( 'wp_version' => '6.7' ) ) ) );
 		$this->assertFalse( $equal( $this->state(), $this->state( array( 'plugin_versions' => array( 'a/a.php' => array( 'name' => 'A', 'version' => '1.1' ) ) ) ) ) );
 	}
+
+	/**
+	 * Bug 47: plugin attivi in rete nel confronto.
+	 */
+	public function test_diff_dei_plugin_di_rete(): void {
+		$a = $this->state( array( 'network_plugins' => array( 'r/r.php' ) ) );
+		$b = $this->state( array( 'network_plugins' => array( 's/s.php' ) ) );
+
+		$diff = DBDM_Snapshots::diff( $a, $b );
+		$this->assertSame( array( 's/s.php' ), $diff['network_activated'] );
+		$this->assertSame( array( 'r/r.php' ), $diff['network_deactivated'] );
+		$this->assertFalse( DBDM_Snapshots::diff_is_empty( $diff ) );
+		$this->assertFalse( dbdm_test_call_private( 'DBDM_Snapshots', 'states_equal', array( $a, $b ) ) );
+		$this->assertTrue( DBDM_Snapshots::diff_is_empty( DBDM_Snapshots::diff( $this->state(), $this->state() ) ), 'snapshot senza network_plugins (precedenti alla 2.0.0)' );
+	}
 }

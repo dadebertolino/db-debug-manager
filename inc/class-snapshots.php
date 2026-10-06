@@ -187,6 +187,8 @@ class DBDM_Snapshots {
 
         return array(
             'active_plugins'  => $active_plugins,
+            // 2.0.0 (bug 47): plugin attivi in rete.
+            'network_plugins' => is_multisite() ? array_keys((array) get_site_option('active_sitewide_plugins', array())) : array(),
             'stylesheet'      => $stylesheet,
             'template'        => $template,
             'plugin_versions' => $plugin_versions,
@@ -201,7 +203,7 @@ class DBDM_Snapshots {
      * erano ignorati.
      */
     private static function states_equal($a, $b) {
-        $fields = array('active_plugins', 'stylesheet', 'template');
+        $fields = array('active_plugins', 'network_plugins', 'stylesheet', 'template');
         foreach ($fields as $f) {
             $va = isset($a[$f]) ? $a[$f] : null;
             $vb = isset($b[$f]) ? $b[$f] : null;
@@ -298,6 +300,9 @@ class DBDM_Snapshots {
         $activated   = array_values(array_diff($b_active, $a_active));
         $deactivated = array_values(array_diff($a_active, $b_active));
 
+        $a_network = (array) ($a['network_plugins'] ?? array());
+        $b_network = (array) ($b['network_plugins'] ?? array());
+
         $a_versions = $a['plugin_versions'] ?? array();
         $b_versions = $b['plugin_versions'] ?? array();
 
@@ -341,6 +346,8 @@ class DBDM_Snapshots {
         return array(
             'plugins_activated'   => $activated,
             'plugins_deactivated' => $deactivated,
+            'network_activated'   => array_values(array_diff($b_network, $a_network)),
+            'network_deactivated' => array_values(array_diff($a_network, $b_network)),
             'plugins_updated'     => $updated,
             'plugins_installed'   => $installed,
             'plugins_removed'     => $removed,
@@ -352,11 +359,53 @@ class DBDM_Snapshots {
     public static function diff_is_empty($d) {
         return empty($d['plugins_activated'])
             && empty($d['plugins_deactivated'])
+            && empty($d['network_activated'])
+            && empty($d['network_deactivated'])
             && empty($d['plugins_updated'])
             && empty($d['plugins_installed'])
             && empty($d['plugins_removed'])
             && empty($d['theme_changed'])
             && empty($d['wp_version_changed']);
+    }
+
+    /**
+     * Porta i plugin attivi (del sito o della rete) a quelli dello snapshot
+     * con le funzioni del core. 2.0.0 (bug 46, 47): prima l'opzione veniva
+     * scritta direttamente, senza hook di attivazione e disattivazione e
+     * senza i plugin attivi in rete. Il Debug Manager non viene mai
+     * disattivato da un ripristino.
+     *
+     * @return array[] Messaggi.
+     */
+    private static function restore_plugin_set($wanted, array $current, array $installed, $network) {
+        $wanted  = array_values(array_filter((array) $wanted, 'is_string'));
+        $valid   = array_values(array_intersect($wanted, $installed));
+        $missing = array_values(array_diff($wanted, $installed));
+        $self    = plugin_basename(DBDM_PLUGIN_FILE);
+
+        $off = array_values(array_diff($current, $valid, array($self)));
+        if ($off) {
+            deactivate_plugins($off, false, $network);
+        }
+        $failed = array();
+        foreach (array_diff($valid, $current) as $plugin) {
+            $result = activate_plugin($plugin, '', $network);
+            if (is_wp_error($result)) {
+                $failed[] = $plugin . ' (' . $result->get_error_message() . ')';
+            }
+        }
+
+        $label = $network
+            ? __('Plugin attivi in rete ripristinati: %d.', 'db-debug-manager')
+            : __('Plugin attivi ripristinati: %d.', 'db-debug-manager');
+        $messages = array(array('ok', sprintf($label, count($valid) - count($failed))));
+        if ($missing) {
+            $messages[] = array('warn', sprintf(__('Non ripristinati (non più installati): %s', 'db-debug-manager'), implode(', ', $missing)));
+        }
+        if ($failed) {
+            $messages[] = array('err', sprintf(__('Attivazione non riuscita: %s', 'db-debug-manager'), implode(', ', $failed)));
+        }
+        return $messages;
     }
 
     /**
@@ -371,22 +420,23 @@ class DBDM_Snapshots {
         $messages = array();
 
         if (in_array('plugins', $parts, true)) {
-            // Filtra solo plugin che esistono ancora sul filesystem (evita fatal su plugin rimossi).
-            $existing = array_keys($snap['plugin_versions'] ?? array());
-            $current_installed = function_exists('get_plugins') ? array_keys(get_plugins()) : $existing;
-            $to_activate = array_values(array_intersect($snap['active_plugins'] ?? array(), $current_installed));
-
-            update_option('active_plugins', $to_activate);
-            $messages[] = array('ok', sprintf(
-                __('Plugin attivi ripristinati: %d.', 'db-debug-manager'),
-                count($to_activate)
+            if (!function_exists('activate_plugin')) {
+                require_once ABSPATH . 'wp-admin/includes/plugin.php';
+            }
+            $installed = array_keys(get_plugins());
+            $messages  = array_merge($messages, self::restore_plugin_set(
+                $snap['active_plugins'] ?? array(),
+                (array) get_option('active_plugins', array()),
+                $installed,
+                false
             ));
-
-            $missing = array_diff($snap['active_plugins'] ?? array(), $current_installed);
-            if (!empty($missing)) {
-                $messages[] = array('warn', sprintf(
-                    __('Non ripristinati (non più installati): %s', 'db-debug-manager'),
-                    implode(', ', $missing)
+            // Snapshot precedenti alla 2.0.0 non hanno i plugin di rete.
+            if (is_multisite() && isset($snap['network_plugins'])) {
+                $messages = array_merge($messages, self::restore_plugin_set(
+                    $snap['network_plugins'],
+                    array_keys((array) get_site_option('active_sitewide_plugins', array())),
+                    $installed,
+                    true
                 ));
             }
         }

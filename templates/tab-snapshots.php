@@ -153,6 +153,18 @@ return ($d && $d !== '.') ? $d : $p;
                                         </li>
                                     <?php endif; ?>
 
+                                    <?php if (!empty($diff['network_activated'])): ?>
+                                        <li>🌐 <?php printf(esc_html__('%d plugin attivati in rete dopo lo snapshot', 'db-debug-manager'), count($diff['network_activated'])); ?>:
+                                            <span class="dbdm-plugin-list"><?php echo esc_html(implode(', ', $diff['network_activated'])); ?></span>
+                                        </li>
+                                    <?php endif; ?>
+
+                                    <?php if (!empty($diff['network_deactivated'])): ?>
+                                        <li>🌐 <?php printf(esc_html__('%d plugin disattivati in rete dopo lo snapshot', 'db-debug-manager'), count($diff['network_deactivated'])); ?>:
+                                            <span class="dbdm-plugin-list"><?php echo esc_html(implode(', ', $diff['network_deactivated'])); ?></span>
+                                        </li>
+                                    <?php endif; ?>
+
                                     <?php if (!empty($diff['plugins_updated'])): ?>
                                         <li>🔄 <?php printf(esc_html__('%d plugin aggiornati', 'db-debug-manager'), count($diff['plugins_updated'])); ?>:
                                             <ul style="margin:4px 0 0 20px;">

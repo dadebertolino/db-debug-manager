@@ -1,6 +1,7 @@
 <?php
 /**
  * Fase 2 su WordPress vero: snapshot prima degli aggiornamenti (bug 45),
+ * ripristino dei plugin con gli hook del core e plugin di rete (bug 46, 47),
  * monitor query solo per l'amministratore che lo attiva (bug 49),
  * disinstallazione (bug 51).
  *
@@ -80,6 +81,99 @@ class Phase2IntegrationTest extends WP_UnitTestCase {
 			$this->assertContains( $id, $ids );
 		}
 		$this->assertCount( 10, $ids );
+	}
+
+	/* --- Ripristino dei plugin (bug 46, 47) ------------------------------- */
+
+	const HOOK_PLUGIN = 'dbdm-hook/dbdm-hook.php';
+
+	/**
+	 * Plugin di prova che registra attivazione e disattivazione.
+	 */
+	private function hook_plugin() {
+		$dir = WP_PLUGIN_DIR . '/dbdm-hook';
+		if ( ! is_dir( $dir ) ) {
+			mkdir( $dir, 0755, true );
+		}
+		file_put_contents(
+			$dir . '/dbdm-hook.php',
+			"<?php\n/*\nPlugin Name: DBDM hook\nNetwork: false\n*/\n" .
+			"register_activation_hook( __FILE__, function () { update_option( 'dbdm_hook_activated', 'si' ); } );\n" .
+			"register_deactivation_hook( __FILE__, function () { update_option( 'dbdm_hook_deactivated', 'si' ); } );\n"
+		);
+		wp_clean_plugins_cache( false );
+	}
+
+	private function remove_hook_plugin() {
+		@unlink( WP_PLUGIN_DIR . '/dbdm-hook/dbdm-hook.php' );
+		@rmdir( WP_PLUGIN_DIR . '/dbdm-hook' );
+		wp_clean_plugins_cache( false );
+	}
+
+	private function snapshot_with( array $state ) {
+		$all   = DBDM_Snapshots::get_all();
+		$all[] = array_merge( array( 'id' => 'snap_p2_' . count( $all ), 'trigger' => 'manual', 'timestamp' => time() ), $state );
+		dbdm_integration_write_snapshots( $all );
+		return end( $all )['id'];
+	}
+
+	public function test_il_ripristino_esegue_gli_hook_di_attivazione_e_disattivazione(): void {
+		$this->admin();
+		$this->hook_plugin();
+		try {
+			$messages = DBDM_Snapshots::restore( $this->snapshot_with( array( 'active_plugins' => array( self::HOOK_PLUGIN, 'non-esiste/x.php' ) ) ), array( 'plugins' ) );
+
+			$this->assertTrue( is_plugin_active( self::HOOK_PLUGIN ) );
+			$this->assertSame( 'si', get_option( 'dbdm_hook_activated' ), 'hook di attivazione eseguito' );
+			$this->assertSame( array( 'ok', 'Plugin attivi ripristinati: 1.' ), $messages[0] );
+			$this->assertSame( 'warn', $messages[1][0] );
+			$this->assertStringContainsString( 'non-esiste/x.php', $messages[1][1] );
+
+			DBDM_Snapshots::restore( $this->snapshot_with( array( 'active_plugins' => array() ) ), array( 'plugins' ) );
+
+			$this->assertFalse( is_plugin_active( self::HOOK_PLUGIN ) );
+			$this->assertSame( 'si', get_option( 'dbdm_hook_deactivated' ), 'hook di disattivazione eseguito' );
+		} finally {
+			deactivate_plugins( self::HOOK_PLUGIN, true );
+			$this->remove_hook_plugin();
+		}
+	}
+
+	public function test_il_ripristino_non_disattiva_il_debug_manager(): void {
+		$self = plugin_basename( DBDM_PLUGIN_FILE );
+		update_option( 'active_plugins', array( $self ) );
+
+		DBDM_Snapshots::restore( $this->snapshot_with( array( 'active_plugins' => array() ) ), array( 'plugins' ) );
+
+		$this->assertContains( $self, (array) get_option( 'active_plugins' ) );
+	}
+
+	/**
+	 * @group ms-required
+	 */
+	public function test_in_multisite_plugin_di_rete_catturati_e_ripristinati(): void {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Richiede WP_MULTISITE=1.' );
+		}
+		$this->admin();
+		$this->hook_plugin();
+		try {
+			activate_plugin( self::HOOK_PLUGIN, '', true );
+			$state = DBDM_Snapshots::capture_state();
+			$this->assertContains( self::HOOK_PLUGIN, $state['network_plugins'] );
+
+			deactivate_plugins( self::HOOK_PLUGIN, true, true );
+			$diff = DBDM_Snapshots::diff( $state, DBDM_Snapshots::capture_state() );
+			$this->assertSame( array( self::HOOK_PLUGIN ), $diff['network_deactivated'] );
+			$this->assertFalse( DBDM_Snapshots::diff_is_empty( $diff ) );
+
+			$messages = DBDM_Snapshots::restore( $this->snapshot_with( $state ), array( 'plugins' ) );
+			$this->assertTrue( is_plugin_active_for_network( self::HOOK_PLUGIN ) );
+			$this->assertContains( array( 'ok', 'Plugin attivi in rete ripristinati: 1.' ), $messages );
+		} finally {
+			deactivate_plugins( self::HOOK_PLUGIN, true, true );
+			$this->remove_hook_plugin();
+		}
 	}
 
 	/* --- Monitor query (bug 49) -------------------------------------------- */
