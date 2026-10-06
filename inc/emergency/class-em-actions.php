@@ -152,14 +152,22 @@ class DBDM_Em_Actions {
      */
     private function toggle_constant($name, $value) {
         $source = $value ? 'true' : 'false';
-        // 1.4.0: WP_DEBUG_LOG attivato va nella cartella privata (o sul percorso
-        // personalizzato ricordato dal pannello), non in wp-content/debug.log
-        // raggiungibile da chiunque.
-        if ($name === 'WP_DEBUG_LOG' && $value) {
-            $saved = $this->repo->get_option('dbdm_debug_log_path', '');
-            $path  = is_string($saved) && $saved !== '' && !in_array(strtolower($saved), array('1', 'true'), true)
-                ? $saved : $this->private_dir . 'debug.log';
-            $source = var_export($path, true);
+        if ($name === 'WP_DEBUG_LOG') {
+            // Come il pannello (DBDM_Admin::constants_to_write()): acceso, il
+            // log va sul percorso personalizzato ricordato o nella cartella
+            // privata, mai in wp-content/debug.log raggiungibile da chiunque
+            // (1.4.0); spento, un percorso personalizzato viene ricordato in
+            // dbdm_debug_log_path per la riaccensione (bug 20).
+            $public = $this->content_dir . '/debug.log';
+            $path   = DBDM_Em_Status::resolve_log_path(DBDM_Em_Status::debug_log_value($this->config_path), $this->content_dir);
+            $custom = $path !== '' && $path !== $public;
+            if ($value) {
+                if ($custom) return true; // Già attivo su un percorso non pubblico.
+                $saved  = DBDM_Em_Status::resolve_log_path($this->repo->get_option('dbdm_debug_log_path', ''), $this->content_dir);
+                $source = var_export($saved !== '' && $saved !== $public ? $saved : $this->private_dir . 'debug.log', true);
+            } elseif ($custom) {
+                $this->repo->save_option('dbdm_debug_log_path', $path);
+            }
         }
         $result = DBDM_Standalone_Config::set_constants(
             $this->config_path,

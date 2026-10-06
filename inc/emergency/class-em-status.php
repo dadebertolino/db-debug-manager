@@ -18,17 +18,36 @@ class DBDM_Em_Status {
     const PHP_LOG_TAIL   = 32768;
 
     /**
-     * Percorso del debug.log come lo usa WordPress con il wp-config.php
-     * attuale: un percorso in WP_DEBUG_LOG, altrimenti wp-content/debug.log.
+     * File in cui WordPress scrive il log con questo valore di WP_DEBUG_LOG,
+     * con la regola di wp_debug_mode(): true, 1, 'true', '1' →
+     * wp-content/debug.log; un'altra stringa è il percorso; altrimenti
+     * nessun log ('').
      */
-    public static function debug_log_path($config_path, $content_dir) {
+    public static function resolve_log_path($value, $content_dir) {
+        if (!$value || !is_scalar($value)) return '';
+        if (in_array(strtolower((string) $value), array('true', '1'), true)) {
+            return $content_dir . '/debug.log';
+        }
+        return is_string($value) ? $value : '';
+    }
+
+    /**
+     * Valore effettivo di WP_DEBUG_LOG in wp-config.php (null se assente).
+     */
+    public static function debug_log_value($config_path) {
         $content = @file_get_contents($config_path);
         $defines = $content ? DBDM_Standalone_Config::effective_defines($content) : array();
-        $value   = isset($defines['WP_DEBUG_LOG']) ? $defines['WP_DEBUG_LOG'] : null;
-        if (is_string($value) && $value !== '' && !in_array(strtolower($value), array('1', 'true'), true)) {
-            return $value;
-        }
-        return $content_dir . '/debug.log';
+        return isset($defines['WP_DEBUG_LOG']) ? $defines['WP_DEBUG_LOG'] : null;
+    }
+
+    /**
+     * Percorso del debug.log come lo usa WordPress con il wp-config.php
+     * attuale: un percorso in WP_DEBUG_LOG, altrimenti wp-content/debug.log
+     * (anche a log spento, per mostrarlo o svuotarlo).
+     */
+    public static function debug_log_path($config_path, $content_dir) {
+        $path = self::resolve_log_path(self::debug_log_value($config_path), $content_dir);
+        return $path !== '' ? $path : $content_dir . '/debug.log';
     }
 
     /**

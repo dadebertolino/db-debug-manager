@@ -217,9 +217,47 @@ class EmergencyActionsTest extends TestCase {
 		$this->run_action( 'toggle_const', array( 'const' => 'WP_DEBUG_LOG', 'enable' => '1' ) );
 		$this->assertSame( $this->private . 'debug.log', DBDM_Standalone_Config::effective_defines( file_get_contents( $this->config ) )['WP_DEBUG_LOG'] );
 
-		$this->pdo->exec( "UPDATE wp_options SET option_value = '/srv/log/wp.log' WHERE option_name = 'dbdm_debug_log_path'" );
+		// Già acceso su un percorso non pubblico: riaccenderlo non cambia nulla.
+		$this->repo->update_option( 'dbdm_debug_log_path', '/srv/log/wp.log' );
+		$this->run_action( 'toggle_const', array( 'const' => 'WP_DEBUG_LOG', 'enable' => '1' ) );
+		$this->assertSame( $this->private . 'debug.log', DBDM_Standalone_Config::effective_defines( file_get_contents( $this->config ) )['WP_DEBUG_LOG'] );
+
+		// Spento e riacceso: vale il percorso ricordato.
+		$this->run_action( 'toggle_const', array( 'const' => 'WP_DEBUG_LOG', 'enable' => '0' ) );
+		$this->repo->update_option( 'dbdm_debug_log_path', '/srv/log/wp.log' );
 		$this->run_action( 'toggle_const', array( 'const' => 'WP_DEBUG_LOG', 'enable' => '1' ) );
 		$this->assertSame( '/srv/log/wp.log', DBDM_Standalone_Config::effective_defines( file_get_contents( $this->config ) )['WP_DEBUG_LOG'] );
+	}
+
+	private function log_define() {
+		return DBDM_Standalone_Config::effective_defines( file_get_contents( $this->config ) )['WP_DEBUG_LOG'];
+	}
+
+	/**
+	 * Bug 20: spegnendo WP_DEBUG_LOG dall'emergency il percorso
+	 * personalizzato andava perso (il pannello lo ricorda in
+	 * dbdm_debug_log_path, che può non esistere ancora).
+	 */
+	public function test_wp_debug_log_spento_e_riacceso_conserva_il_percorso(): void {
+		$this->pdo->exec( "DELETE FROM wp_options WHERE option_name = 'dbdm_debug_log_path'" );
+		DBDM_Standalone_Config::set_constants( $this->config, array( 'WP_DEBUG_LOG' => "'/srv/log/custom.log'" ) );
+
+		$this->assertSame( array( array( 'ok', 'WP_DEBUG_LOG impostata a false' ) ), $this->run_action( 'toggle_const', array( 'const' => 'WP_DEBUG_LOG', 'enable' => '0' ) ) );
+		$this->assertFalse( $this->log_define() );
+		$this->assertSame( '/srv/log/custom.log', $this->repo->get_option( 'dbdm_debug_log_path' ) );
+
+		$this->run_action( 'toggle_const', array( 'const' => 'WP_DEBUG_LOG', 'enable' => '1' ) );
+		$this->assertSame( '/srv/log/custom.log', $this->log_define() );
+	}
+
+	public function test_il_percorso_pubblico_non_viene_ricordato(): void {
+		DBDM_Standalone_Config::set_constants( $this->config, array( 'WP_DEBUG_LOG' => var_export( $this->content . '/debug.log', true ) ) );
+		$this->run_action( 'toggle_const', array( 'const' => 'WP_DEBUG_LOG', 'enable' => '0' ) );
+		$this->assertSame( '', $this->repo->get_option( 'dbdm_debug_log_path' ) );
+
+		$this->repo->update_option( 'dbdm_debug_log_path', $this->content . '/debug.log' );
+		$this->run_action( 'toggle_const', array( 'const' => 'WP_DEBUG_LOG', 'enable' => '1' ) );
+		$this->assertSame( $this->private . 'debug.log', $this->log_define(), 'un valore ricordato che porta al log pubblico è ignorato' );
 	}
 
 	public function test_costante_non_gestita_ignorata(): void {

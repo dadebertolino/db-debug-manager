@@ -48,6 +48,21 @@ class DBDM_Em_Repository {
     }
 
     /**
+     * Salva un'opzione, creandola se manca (autoload spento), come
+     * update_option().
+     */
+    public function save_option($name, $value) {
+        $stmt = $this->pdo->prepare("SELECT 1 FROM {$this->table} WHERE option_name = :n LIMIT 1");
+        $stmt->execute(array(':n' => $name));
+        if ($stmt->fetchColumn() !== false) {
+            $this->update_option($name, $value);
+            return;
+        }
+        $this->pdo->prepare("INSERT INTO {$this->table} (option_name, option_value, autoload) VALUES (:n, :v, 'no')")
+            ->execute(array(':n' => $name, ':v' => is_array($value) ? serialize($value) : $value));
+    }
+
+    /**
      * Plugin attivi del sito, null se l'opzione manca o non è un elenco.
      *
      * @return string[]|null
