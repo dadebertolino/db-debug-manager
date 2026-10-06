@@ -32,6 +32,7 @@ const DBDM_E2E_CONSTANTS  = array( 'WP_DEBUG', 'WP_DEBUG_LOG', 'WP_DEBUG_DISPLAY
 
 const DBDM_E2E_BROKEN_PLUGIN = 'dbdm-e2e-rotto/dbdm-e2e-rotto.php';
 const DBDM_E2E_BROKEN_THEME  = 'dbdm-e2e-tema-rotto';
+const DBDM_E2E_QUOTE_PLUGIN  = "dbdm-e2e-l'apostrofo/dbdm-e2e-apostrofo.php";
 
 /**
  * "Sito rotto": il plugin o il tema di prova vanno in fatal a ogni
@@ -226,6 +227,7 @@ function dbdm_e2e_raw_option( $name, ...$value ) {
  *               cui padre non esiste). Rimossi a ogni reset.
  *  - broken     string  'plugin' o 'theme': sito in fatal a ogni richiesta
  *               per colpa di un plugin attivo o del tema attivo.
+ *  - quote_plugin bool  Plugin attivo con un apostrofo nello slug.
  *
  * @param array $args
  * @return array|WP_Error Stato risultante (vedi dbdm_e2e_state()).
@@ -276,12 +278,30 @@ function dbdm_e2e_reset( $args = array() ) {
 		activate_plugin( 'db-debug-manager/db-debug-manager.php' );
 	}
 
-	// Plugin rotto: tolto da quelli attivi e cancellato. Lettura e scrittura
-	// sul database: in questa richiesta i filtri qui sopra lo nascondono.
-	$active = array_values( array_diff( (array) maybe_unserialize( dbdm_e2e_raw_option( 'active_plugins' ) ), array( DBDM_E2E_BROKEN_PLUGIN ) ) );
+	// Plugin di prova (rotto, con apostrofo): tolti da quelli attivi e
+	// cancellati. Lettura e scrittura sul database: in questa richiesta i
+	// filtri qui sopra nascondono il plugin rotto.
+	$active = array_values(
+		array_filter(
+			(array) maybe_unserialize( dbdm_e2e_raw_option( 'active_plugins' ) ),
+			function ( $plugin ) {
+				return 0 !== strpos( (string) $plugin, 'dbdm-e2e-' );
+			}
+		)
+	);
 	dbdm_e2e_raw_option( 'active_plugins', $active );
-	dbdm_e2e_rmdir( WP_PLUGIN_DIR . '/' . dirname( DBDM_E2E_BROKEN_PLUGIN ) );
+	foreach ( glob( WP_PLUGIN_DIR . '/dbdm-e2e-*', GLOB_ONLYDIR ) ?: array() as $dir ) {
+		dbdm_e2e_rmdir( $dir );
+	}
 	wp_clean_plugins_cache( false );
+
+	// Plugin attivo con un apostrofo nello slug (bug 18).
+	if ( ! empty( $args['quote_plugin'] ) ) {
+		wp_mkdir_p( WP_PLUGIN_DIR . '/' . dirname( DBDM_E2E_QUOTE_PLUGIN ) );
+		file_put_contents( WP_PLUGIN_DIR . '/' . DBDM_E2E_QUOTE_PLUGIN, "<?php\n/*\nPlugin Name: DBDM E2E apostrofo\n*/\n" );
+		$active[] = DBDM_E2E_QUOTE_PLUGIN;
+		dbdm_e2e_raw_option( 'active_plugins', $active );
+	}
 
 	// Tema predefinito (un'azione dell'emergency può averlo cambiato).
 	if ( wp_get_theme( WP_DEFAULT_THEME )->exists() ) {

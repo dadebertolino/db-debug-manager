@@ -133,7 +133,7 @@ if (!$dbdm_is_apache):
     <div class="db-ui-card-body" style="font-size:13px; line-height:1.7;">
         <ol style="margin:0; padding-left:20px;">
             <li><?php esc_html_e('In una finestra privata del browser, apri:', 'db-debug-manager'); ?>
-                <br><a href="<?php echo esc_url($access_url); ?>" target="_blank"><code><?php echo esc_html($access_url); ?></code></a>
+                <br><a href="<?php echo esc_url($access_url); ?>" target="_blank" rel="noopener" style="word-break:break-all;"><?php echo esc_html($access_url); ?></a>
             </li>
             <li><?php esc_html_e('Inserisci la password configurata.', 'db-debug-manager'); ?></li>
             <li><?php esc_html_e('Se vedi la dashboard, funziona anche quando WP è morto.', 'db-debug-manager'); ?></li>
