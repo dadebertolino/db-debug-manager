@@ -89,7 +89,21 @@ class DBDM_Em_Request {
         return rtrim(dirname($script), '/') . '/';
     }
 
+    /**
+     * Richiesta su HTTPS, anche dietro un proxy che termina il TLS
+     * (2.0.0, bug 35). Serve solo al flag secure del cookie: un header
+     * falsificato può renderlo più restrittivo, mai meno, quindi gli header
+     * del proxy si leggono anche senza "proxy fidato".
+     */
     public function is_https() {
-        return !empty($this->server['HTTPS']);
+        $s = $this->server;
+        if (!empty($s['HTTPS']) && is_string($s['HTTPS']) && strtolower($s['HTTPS']) !== 'off') return true;
+        if (isset($s['SERVER_PORT']) && (string) $s['SERVER_PORT'] === '443') return true;
+        if (!empty($s['HTTP_X_FORWARDED_PROTO']) && is_string($s['HTTP_X_FORWARDED_PROTO'])) {
+            $parts = explode(',', $s['HTTP_X_FORWARDED_PROTO']);
+            if (strtolower(trim($parts[0])) === 'https') return true;
+        }
+        return !empty($s['HTTP_X_FORWARDED_SSL']) && is_string($s['HTTP_X_FORWARDED_SSL'])
+            && strtolower($s['HTTP_X_FORWARDED_SSL']) === 'on';
     }
 }

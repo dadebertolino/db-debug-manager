@@ -82,7 +82,30 @@ class DBDM_Em_App {
 
     public function run(DBDM_Em_Request $request) {
         DBDM_Em_Session::start($request);
+        // Dopo session_start(), che invia i propri header di cache.
+        foreach (self::security_headers() as $header) {
+            header($header);
+        }
         $this->dispatch($request, new DBDM_Em_Session($_SESSION));
+    }
+
+    /**
+     * Header di ogni risposta (2.0.0, bug 35): niente framing
+     * (clickjacking sulle azioni distruttive), niente indicizzazione, niente
+     * cache (pagine con log e dati del sito), niente referrer.
+     *
+     * @return string[]
+     */
+    public static function security_headers() {
+        return array(
+            'X-Frame-Options: DENY',
+            "Content-Security-Policy: frame-ancestors 'none'",
+            'X-Robots-Tag: noindex, nofollow',
+            'Cache-Control: no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma: no-cache',
+            'Referrer-Policy: no-referrer',
+            'X-Content-Type-Options: nosniff',
+        );
     }
 
     /**

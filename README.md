@@ -161,6 +161,7 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Sicurezza (emergency): header contro framing, indicizzazione e cache** (`X-Frame-Options`, `frame-ancestors`, `X-Robots-Tag`, `Cache-Control: no-store`, `Referrer-Policy`, `nosniff`). Il cookie di sessione è `secure` anche dietro un proxy che termina HTTPS.
 - **Fix (emergency): logout tramite un semplice link.** Una pagina esterna poteva chiudere la sessione d'emergenza; ora il logout è un modulo con token.
 - **Fix (emergency): pagina bianca (errore 500) se il database risponde ma le tabelle non corrispondono** a `$table_prefix`. Ora una pagina spiega cosa controllare; il dettaglio tecnico va nel log degli errori di PHP.
 - **Fix (emergency): stato delle costanti di debug sbagliato** con `define( 'WP_DEBUG', 1 )`, valori da `getenv()`, `define` condizionali o copie commentate. Ora è letto come lo vede PHP; un valore non determinabile è indicato come "da verificare".

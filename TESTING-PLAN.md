@@ -87,7 +87,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 32 ✅ | C | `emergency.php:217,312,494` | `unserialize()` senza `allowed_classes => false` | U |
 | 33 ½ | C | `emergency.php:178` e altri | `csrf`/`password` inviati come array → TypeError, pagina 500 (anche senza login) | E |
 | 34 ✅ | C | `emergency.php:210` | `PDOException` non gestita (prefisso tabelle sbagliato) → 500 vuoto | U/E |
-| 35 | C | `emergency.php` | Mancano `X-Frame-Options`/`frame-ancestors`, `X-Robots-Tag`, `Cache-Control: no-store`; cookie `secure` non rilevato dietro proxy TLS; durata sessione PHP < 30 minuti | E |
+| 35 ✅ | C | `emergency.php` | Mancano `X-Frame-Options`/`frame-ancestors`, `X-Robots-Tag`, `Cache-Control: no-store`; cookie `secure` non rilevato dietro proxy TLS; durata sessione PHP < 30 minuti | E |
 | 36 | C | `emergency.php` | Log accessi e file del rate limit senza rotazione; righe di log falsificabili con a capo | U/E |
 | 37 | C | `emergency.php:194` | Prima del login rivela se l'emergency è attivo, se c'è una password, se il DB risponde; mostra per intero l'error log del server | E |
 | 38 ✅ | C | `emergency.php:250` | Logout via GET senza CSRF | E |

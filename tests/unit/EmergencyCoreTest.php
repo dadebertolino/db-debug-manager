@@ -79,6 +79,46 @@ class EmergencyCoreTest extends TestCase {
 		$this->assertSame( '-', $r->user_agent() );
 	}
 
+	/**
+	 * Bug 35: dietro un proxy TLS (o con HTTPS=off di IIS) il cookie di
+	 * sessione non riceveva il flag secure, o lo riceveva a torto.
+	 *
+	 * @dataProvider richieste_https
+	 */
+	public function test_https_anche_dietro_un_proxy( $server, $https ): void {
+		$this->assertSame( $https, ( new DBDM_Em_Request( array(), array(), $server ) )->is_https() );
+	}
+
+	public function richieste_https() {
+		return array(
+			'HTTPS on'                  => array( array( 'HTTPS' => 'on' ), true ),
+			'HTTPS off (IIS)'           => array( array( 'HTTPS' => 'off' ), false ),
+			'porta 443'                 => array( array( 'SERVER_PORT' => '443' ), true ),
+			'X-Forwarded-Proto https'   => array( array( 'HTTP_X_FORWARDED_PROTO' => 'https' ), true ),
+			'X-Forwarded-Proto catena'  => array( array( 'HTTP_X_FORWARDED_PROTO' => 'HTTPS, http' ), true ),
+			'X-Forwarded-Proto http'    => array( array( 'HTTP_X_FORWARDED_PROTO' => 'http' ), false ),
+			'X-Forwarded-SSL'           => array( array( 'HTTP_X_FORWARDED_SSL' => 'on' ), true ),
+			'http semplice'             => array( array( 'SERVER_PORT' => '80' ), false ),
+		);
+	}
+
+	/**
+	 * Bug 35: niente header contro framing, indicizzazione e cache.
+	 */
+	public function test_header_di_sicurezza(): void {
+		$headers = DBDM_Em_App::security_headers();
+		foreach ( array(
+			'X-Frame-Options: DENY',
+			"Content-Security-Policy: frame-ancestors 'none'",
+			'X-Robots-Tag: noindex, nofollow',
+			'Cache-Control: no-store, no-cache, must-revalidate, max-age=0',
+			'Referrer-Policy: no-referrer',
+			'X-Content-Type-Options: nosniff',
+		) as $expected ) {
+			$this->assertContains( $expected, $headers );
+		}
+	}
+
 	/* --- Sessione e CSRF ----------------------------------------------------- */
 
 	public function test_token_csrf_stabile_e_confronto_rigoroso(): void {
