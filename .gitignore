@@ -1,0 +1,18 @@
+/vendor/
+/node_modules/
+composer.lock
+*.zip
+.phpcs.cache
+.phpunit.result.cache
+/playwright-report/
+/test-results/
+.wp-env-*
+.DS_Store
+
+# Cartella privata creata dal plugin in sviluppo / wp-env (backup di
+# wp-config.php, snapshot, log emergency): non va mai versionata.
+/private/
+/private-*/
+
+# Sessione admin salvata dagli E2E
+tests/e2e/.auth/

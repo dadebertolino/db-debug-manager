@@ -1,0 +1,103 @@
+name: E2E
+
+# Workflow riutilizzabile: wp-env (WordPress in Docker) +
+# Playwright. Chiamato dalla CI (versione di WordPress di .wp-env.json) e
+# dalla run notturna (WordPress in sviluppo, PHP più recente).
+
+on:
+  workflow_call:
+    inputs:
+      core:
+        description: 'Sorgente WordPress per wp-env (vuoto = quella di .wp-env.json).'
+        type: string
+        default: ''
+      php:
+        description: 'Versione PHP per wp-env (vuoto = quella di .wp-env.json).'
+        type: string
+        default: ''
+      label:
+        description: 'Suffisso per il nome del report (distingue le varianti).'
+        type: string
+        default: 'ci'
+
+jobs:
+  e2e:
+    name: E2E (${{ inputs.label }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Variante WordPress / PHP
+        # WP_ENV_CORE e WP_ENV_PHP_VERSION, letti da wp-env, sovrascrivono
+        # core e phpVersion di .wp-env.json senza modificarlo. Impostati solo
+        # se richiesti: vuoti, vale .wp-env.json.
+        env:
+          CORE: ${{ inputs.core }}
+          PHP: ${{ inputs.php }}
+        run: |
+          if [ -n "$CORE" ]; then echo "WP_ENV_CORE=$CORE" >> "$GITHUB_ENV"; fi
+          if [ -n "$PHP" ]; then echo "WP_ENV_PHP_VERSION=$PHP" >> "$GITHUB_ENV"; fi
+          echo "core=${CORE:-.wp-env.json} php=${PHP:-.wp-env.json}"
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dipendenze npm
+        # Lockfile versionato: installazione riproducibile e cache npm.
+        run: npm ci --no-audit --no-fund
+
+      - name: Versione di Playwright
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache browser Playwright
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Install browser Playwright
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Dipendenze di sistema Playwright (browser da cache)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Avvia wp-env
+        # wp-env legge .wp-env.json: monta il plugin e il mu-plugin di
+        # fixture. Docker è preinstallato sui runner ubuntu.
+        run: npx wp-env start --debug
+
+      - name: Diagnostica wp-env
+        # Conferma che WordPress risponda prima di procedere.
+        run: |
+          npx wp-env run cli wp core version || {
+            echo "::error::wp-env non risponde. Log dei container:"
+            npx wp-env logs --watch=false || true
+            exit 1
+          }
+          npx wp-env run cli php -v | head -1
+
+      - name: Configura ambiente di test (pdo_mysql, permessi, baseline)
+        run: npm run env:setup
+
+      - name: Playwright E2E
+        run: npx playwright test
+
+      - name: Log wp-env in caso di fallimento
+        if: ${{ failure() }}
+        run: npx wp-env logs --watch=false || true
+
+      - name: Carica report Playwright (se fallisce)
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report-${{ inputs.label }}
+          path: playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
