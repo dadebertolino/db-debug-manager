@@ -161,6 +161,7 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Fix: la regola Nginx suggerita nella tab Emergency proteggeva la vecchia cartella** dentro il plugin. Ora indica `wp-content/dbdm-private-*` (anche con `wp-content` spostata). Chi aveva copiato la regola precedente dovrebbe sostituirla (nel frattempo i file restano protetti dal nome casuale della cartella).
 - **Sicurezza (emergency): nessuna informazione prima del login.** Se l'accesso non è disponibile la pagina lo dice e basta; il motivo (disattivato, senza password, database, cartella privata) va nel log degli errori di PHP. Dopo il login l'error log di PHP mostra solo le voci di questo sito, non quelle di altri siti sullo stesso server.
 - **Emergency: avviso con object cache persistente** (Redis, Memcached): le modifiche ai plugin attivi e al tema possono non avere effetto finché la cache non viene svuotata.
 - **Fix (emergency): log degli accessi senza limite e falsificabile.** Ora ruota a 1 MB (una copia precedente) e gli a capo inviati dal client (User-Agent, campi dei moduli) non possono più creare righe false.

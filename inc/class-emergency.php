@@ -149,6 +149,16 @@ class DBDM_Emergency {
     }
 
     /**
+     * Regola Nginx che nega l'accesso HTTP alle cartelle private (dove
+     * .htaccess non vale). 2.0.0 (bug 60): prima indicava la vecchia
+     * posizione dentro la cartella del plugin.
+     */
+    public static function nginx_rule() {
+        $path = wp_parse_url(content_url(), PHP_URL_PATH);
+        return 'location ^~ ' . rtrim(is_string($path) ? $path : '/wp-content', '/') . '/dbdm-private- { deny all; }';
+    }
+
+    /**
      * Percorsi del sito per emergency.php.
      *
      * @return array{content_dir:string,plugins_dir:string,themes_dir:string}

@@ -351,6 +351,11 @@ if ( ! function_exists( 'home_url' ) ) {
 		return 'https://debug.example' . ( $path ? '/' . ltrim( $path, '/' ) : '' );
 	}
 }
+if ( ! function_exists( 'content_url' ) ) {
+	function content_url( $path = '' ) {
+		return apply_filters( 'content_url', home_url( 'wp-content' . ( $path ? '/' . ltrim( $path, '/' ) : '' ) ), $path );
+	}
+}
 if ( ! function_exists( 'site_url' ) ) {
 	function site_url( $path = '' ) {
 		return home_url( $path );

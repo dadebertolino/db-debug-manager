@@ -72,6 +72,19 @@ class PrivateDirAndSettingsTest extends TestCase {
 		$this->assertFileDoesNotExist( $log . '.1' );
 	}
 
+	/**
+	 * Bug 60: la regola Nginx suggerita proteggeva la vecchia cartella
+	 * dentro il plugin; dalla 1.4.0 i file stanno in wp-content/dbdm-private-*.
+	 */
+	public function test_regola_nginx_sulla_cartella_privata(): void {
+		$this->assertSame( 'location ^~ /wp-content/dbdm-private- { deny all; }', DBDM_Emergency::nginx_rule() );
+
+		add_filter( 'content_url', function () {
+			return 'https://debug.example/app/contenuti';
+		} );
+		$this->assertSame( 'location ^~ /app/contenuti/dbdm-private- { deny all; }', DBDM_Emergency::nginx_rule() );
+	}
+
 	public function test_migrazione_dalla_cartella_del_plugin(): void {
 		$token = 'abcdef0123456789';
 		update_option( DBDM_Emergency::OPTION_DIR_TOKEN, $token );
