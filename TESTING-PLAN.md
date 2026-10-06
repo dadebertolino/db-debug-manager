@@ -80,7 +80,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 25 ✅ | B | `class-standalone-config.php:19` | `wp-config.php` sopra la root di WordPress o plugin in symlink: non trovato | U |
 | 26 | B | `emergency.php:301` | Multisite ignorato: plugin attivi in rete, temi e transient degli altri siti | I (multisite) + E |
 | 27 | B | — | Con object cache persistente (Redis/Memcached) le azioni scrivono nel DB ma il sito continua a usare i valori in cache: nessun avviso | U (rilevamento del drop-in) |
-| 28 | B | `emergency.php:330` | "Cambia a tema default" può scegliere il tema attivo (rotto) o un child theme | I + E |
+| 28 ✅ | B | `emergency.php:330` | "Cambia a tema default" può scegliere il tema attivo (rotto) o un child theme | I + E |
 | 29 ✅ | B | `emergency.php:138,155` | Il blocco conta dal primo errore, non dal quinto: finestra più corta del dichiarato | U (orologio iniettabile) |
 | 30 | B | `emergency.php:297` e azioni | Successo riportato anche quando nulla cambia (plugin non attivo, opzione mancante); token CSRF scaduto ignorato senza avviso | E |
 | 31 | B | `emergency.php:505` | Stato delle costanti letto male (`1`, `getenv`, condizionali) | U |

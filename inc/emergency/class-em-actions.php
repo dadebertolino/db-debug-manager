@@ -99,7 +99,8 @@ class DBDM_Em_Actions {
     }
 
     private function switch_to_default_theme(DBDM_Em_Request $request) {
-        $target = self::default_theme($this->themes_dir);
+        $exclude = array_filter(array($this->repo->get_option('stylesheet'), $this->repo->get_option('template')), 'is_string');
+        $target  = self::default_theme($this->themes_dir, $exclude);
         if (!$target) {
             return array(array('err', 'Nessun tema alternativo trovato in ' . $this->themes_dir . '.'));
         }
@@ -111,19 +112,21 @@ class DBDM_Em_Actions {
 
     /**
      * Tema da attivare al posto di quello attuale: il tema default più
-     * recente installato, altrimenti il primo tema con style.css.
+     * recente installato, altrimenti il primo in ordine alfabetico.
+     * 2.0.0 (bug 28): mai il tema attivo né il suo padre (probabilmente la
+     * causa del problema), mai un child theme; solo temi con style.css.
      *
+     * @param string   $themes_dir
+     * @param string[] $exclude    Stylesheet e template attivi.
      * @return string|null
      */
-    public static function default_theme($themes_dir) {
-        foreach (self::DEFAULT_THEMES as $t) {
-            if (is_dir($themes_dir . '/' . $t)) return $t;
-        }
-        $entries = @scandir($themes_dir);
-        foreach (is_array($entries) ? $entries : array() as $entry) {
-            if ($entry[0] !== '.' && is_dir($themes_dir . '/' . $entry) && file_exists($themes_dir . '/' . $entry . '/style.css')) {
-                return $entry;
-            }
+    public static function default_theme($themes_dir, array $exclude = array()) {
+        $entries    = @scandir($themes_dir);
+        $candidates = array_merge(self::DEFAULT_THEMES, is_array($entries) ? $entries : array());
+        foreach ($candidates as $slug) {
+            if ($slug === '' || $slug[0] === '.' || in_array($slug, $exclude, true)) continue;
+            $theme = DBDM_Emergency_Guard::restorable_theme($slug, $themes_dir);
+            if ($theme['ok'] && $theme['template'] === $slug) return $slug;
         }
         return null;
     }

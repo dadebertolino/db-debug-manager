@@ -185,6 +185,47 @@ class EmergencyActionsTest extends TestCase {
 		$this->assertSame( 'mio', DBDM_Em_Actions::default_theme( $this->content . '/temi' ) );
 	}
 
+	/**
+	 * Bug 28: il tema scelto poteva essere quello attivo (rotto) o un child
+	 * theme (che dipende da un padre).
+	 */
+	public function test_tema_di_ripiego_mai_quello_attivo(): void {
+		$this->theme( 'twentytwentyfour' );
+		$this->theme( 'twentytwentyone' );
+		$this->pdo->exec( "UPDATE wp_options SET option_value = 'twentytwentyfour' WHERE option_name IN ('stylesheet', 'template')" );
+
+		$this->assertSame( array( array( 'ok', 'Tema cambiato a: twentytwentyone' ) ), $this->run_action( 'switch_to_default_theme' ) );
+		$this->assertSame( 'twentytwentyone', $this->raw( 'stylesheet' ) );
+	}
+
+	public function test_tema_di_ripiego_mai_il_padre_del_tema_attivo(): void {
+		$this->theme( 'twentytwentyfive' );
+		$this->theme( 'figlio', 'twentytwentyfive' );
+		$this->theme( 'altro' );
+		$this->pdo->exec( "UPDATE wp_options SET option_value = 'figlio' WHERE option_name = 'stylesheet'" );
+		$this->pdo->exec( "UPDATE wp_options SET option_value = 'twentytwentyfive' WHERE option_name = 'template'" );
+
+		$this->run_action( 'switch_to_default_theme' );
+		$this->assertSame( 'altro', $this->raw( 'stylesheet' ) );
+	}
+
+	public function test_tema_di_ripiego_mai_un_child_theme(): void {
+		$this->theme( 'aaa-figlio', 'padre' );
+		$this->theme( 'padre' );
+
+		$this->run_action( 'switch_to_default_theme' );
+		$this->assertSame( 'padre', $this->raw( 'stylesheet' ) );
+		$this->assertSame( 'padre', $this->raw( 'template' ) );
+	}
+
+	public function test_un_tema_default_senza_style_css_e_saltato(): void {
+		mkdir( $this->content . '/temi/twentytwentyfive' );
+		$this->theme( 'twentytwentythree' );
+
+		$this->run_action( 'switch_to_default_theme' );
+		$this->assertSame( 'twentytwentythree', $this->raw( 'stylesheet' ) );
+	}
+
 	public function test_nessun_tema_disponibile(): void {
 		$notices = $this->run_action( 'switch_to_default_theme' );
 

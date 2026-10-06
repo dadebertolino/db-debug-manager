@@ -161,6 +161,7 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Fix (emergency): "Cambia a tema default" poteva scegliere il tema rotto stesso o un child theme.** Ora esclude il tema attivo e il suo padre e sceglie solo temi completi.
 - **Fix (emergency): con `WP_CONTENT_DIR` o la cartella dei plugin spostati**, l'emergency cercava temi, plugin e `debug.log` nelle posizioni standard (cambio di tema e ripristino degli snapshot fallivano). Ora usa i percorsi che WordPress salva insieme alla cartella privata.
 - **Fix (emergency): spegnendo `WP_DEBUG_LOG` il percorso personalizzato del log andava perso.** Ora viene ricordato come fa il pannello, e alla riaccensione il log torna lì; un percorso ricordato che porterebbe al log pubblico è ignorato.
 - **Fix (emergency): debug.log e error log di PHP apparivano vuoti** se contenevano un byte non UTF-8 (testo Latin-1, coda tagliata a metà carattere). Ora i caratteri non validi sono mostrati come �.
