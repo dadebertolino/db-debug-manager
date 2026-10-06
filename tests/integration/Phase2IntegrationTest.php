@@ -54,10 +54,11 @@ class Phase2IntegrationTest extends WP_UnitTestCase {
 	}
 
 	public function test_dopo_l_aggiornamento_solo_per_il_core(): void {
-		do_action( 'upgrader_process_complete', null, array( 'type' => 'plugin', 'action' => 'update', 'plugins' => array( 'hello.php' ) ) );
+		// Chiamata diretta: l'azione del core richiama anche gli upgrader delle traduzioni.
+		DBDM_Snapshots::on_upgrade_complete( null, array( 'type' => 'plugin', 'action' => 'update', 'plugins' => array( 'hello.php' ) ) );
 		$this->assertSame( array(), DBDM_Snapshots::get_all() );
 
-		do_action( 'upgrader_process_complete', null, array( 'type' => 'core', 'action' => 'update' ) );
+		DBDM_Snapshots::on_upgrade_complete( null, array( 'type' => 'core', 'action' => 'update' ) );
 		$all = DBDM_Snapshots::get_all();
 		$this->assertCount( 1, $all );
 		$this->assertSame( DBDM_Snapshots::TRIGGER_UPGRADE, $all[0]['trigger'] );
@@ -245,19 +246,12 @@ class Phase2IntegrationTest extends WP_UnitTestCase {
 		delete_option( DBDM_Emergency::OPTION_DIR_TOKEN );
 		// Un'altra richiesta scrive il token dopo che questa l'ha letto vuoto.
 		$wpdb->insert( $wpdb->options, array( 'option_name' => DBDM_Emergency::OPTION_DIR_TOKEN, 'option_value' => 'abcdef0123456789', 'autoload' => 'no' ) );
-		$stale = function () {
+		// La prima lettura lo vede ancora vuoto.
+		$stale = function () use ( &$stale ) {
+			remove_filter( 'pre_option_' . DBDM_Emergency::OPTION_DIR_TOKEN, $stale );
 			return '';
 		};
 		add_filter( 'pre_option_' . DBDM_Emergency::OPTION_DIR_TOKEN, $stale );
-		// add_option() controlla se l'opzione esiste: da lì in poi la lettura
-		// non è più quella vecchia.
-		add_filter(
-			'default_option_' . DBDM_Emergency::OPTION_DIR_TOKEN,
-			function ( $default ) use ( $stale ) {
-				remove_filter( 'pre_option_' . DBDM_Emergency::OPTION_DIR_TOKEN, $stale );
-				return $default;
-			}
-		);
 
 		$dir = DBDM_Emergency::private_dir();
 

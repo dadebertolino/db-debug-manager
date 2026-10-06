@@ -152,23 +152,30 @@ class DBDM_Emergency {
     }
 
     /**
-     * Nuovo token della cartella privata. 2.0.0 (bug 55): add_option()
-     * fallisce se un'altra richiesta lo ha appena creato, e allora vale il
-     * suo (prima ciascuna richiesta scriveva il proprio e creava una
-     * cartella diversa).
+     * Nuovo token della cartella privata. 2.0.0 (bug 55): inserimento
+     * atomico (INSERT IGNORE); se un'altra richiesta lo ha appena creato
+     * vale il suo. add_option() non basta: con l'opzione assente nella
+     * cache fa INSERT ... ON DUPLICATE KEY UPDATE e sovrascrive.
      */
     private static function create_token() {
+        global $wpdb;
         $new = bin2hex(random_bytes(8));
-        if (add_option(self::OPTION_DIR_TOKEN, $new, '', false)) {
-            return $new;
-        }
+        $wpdb->query($wpdb->prepare(
+            "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')",
+            self::OPTION_DIR_TOKEN,
+            $new
+        ));
+        $stored = $wpdb->get_var($wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
+            self::OPTION_DIR_TOKEN
+        ));
         wp_cache_delete(self::OPTION_DIR_TOKEN, 'options');
         wp_cache_delete('notoptions', 'options');
         wp_cache_delete('alloptions', 'options');
-        $existing = get_option(self::OPTION_DIR_TOKEN, '');
-        if (self::valid_token($existing)) {
-            return $existing;
+        if (self::valid_token($stored)) {
+            return $stored;
         }
+        // Valore presente ma non valido: si sostituisce.
         update_option(self::OPTION_DIR_TOKEN, $new, false);
         return $new;
     }

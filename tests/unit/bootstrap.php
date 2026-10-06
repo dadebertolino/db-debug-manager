@@ -210,6 +210,41 @@ if ( ! function_exists( '_doing_it_wrong' ) ) {
 	}
 }
 
+/* --- $wpdb minimale ------------------------------------------------------ */
+
+/**
+ * Basta per le query dirette sulle opzioni (token della cartella privata):
+ * INSERT IGNORE e SELECT di un valore, sullo store di get_option().
+ */
+class DBDM_Test_Wpdb { // phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
+	public $options = 'wp_options';
+	public function prepare( $query, ...$args ) {
+		return array( $query, $args );
+	}
+	public function query( $prepared ) {
+		list( $query, $args ) = $prepared;
+		if ( 0 === strpos( $query, 'INSERT IGNORE' ) ) {
+			if ( array_key_exists( $args[0], $GLOBALS['__dbdm_options'] ) ) {
+				return 0;
+			}
+			$GLOBALS['__dbdm_options'][ $args[0] ] = $args[1];
+			return 1;
+		}
+		return false;
+	}
+	public function get_var( $prepared ) {
+		list( , $args ) = $prepared;
+		return array_key_exists( $args[0], $GLOBALS['__dbdm_options'] ) ? $GLOBALS['__dbdm_options'][ $args[0] ] : null;
+	}
+}
+$GLOBALS['wpdb'] = new DBDM_Test_Wpdb();
+
+if ( ! function_exists( 'wp_cache_delete' ) ) {
+	function wp_cache_delete( $key, $group = '' ) {
+		return true;
+	}
+}
+
 /* --- Errori e permessi sui file ------------------------------------------ */
 
 if ( ! class_exists( 'WP_Error' ) ) {
