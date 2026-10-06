@@ -161,6 +161,10 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Fix: "Aggiorna" e l'auto-refresh del log mostravano sempre il contenuto di quando la pagina era stata caricata.** Ora mostrano le righe nuove, anche con un filtro attivo; il viewer c'è anche se il log nasce dopo, e una sessione scaduta viene segnalata.
+- **Fix: un byte non UTF-8 rendeva vuoti il viewer del log e la tab Query.**
+- **Fix: messaggi del pannello.** "Snapshot eliminato", "Ripristino completato" e simili comparivano anche in caso di errore, e un link con `?err=` poteva far mostrare un testo qualsiasi. Ora gli avvisi riflettono l'esito reale e non vengono più dalla query string.
+- **Download del log:** dimensione coerente anche se il file cresce, buffer svuotati, `nosniff`.
 - **Fix: il viewer del log segue il file in cui PHP scrive davvero** (l'`error_log` impostato da WordPress); `WP_DEBUG_LOG` a `'0'` non è più scambiato per un file.
 - **Emergency in multisite:** mostra e disattiva anche i plugin attivi in rete (la causa più comune di una rete ferma); "Disattiva tutti" e "Svuota transient" valgono anche per la rete. Tema e opzioni restano quelli del sito principale.
 - **Snapshot:** quelli automatici non espellono più quelli manuali (5 posti ciascuno); per plugin e temi lo snapshot automatico è fatto *prima* dell'aggiornamento (uno per richiesta, anche negli aggiornamenti in blocco). Il ripristino attiva e disattiva i plugin come la pagina Plugin (con i loro hook) e, in multisite, riporta anche i plugin attivi in rete. Lettura e scrittura degli snapshot sotto lock.

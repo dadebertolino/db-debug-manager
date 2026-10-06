@@ -376,6 +376,21 @@ add_action(
 			)
 		);
 		// Disattivazione del plugin come dalla pagina Plugin (hook compresi).
+		// Accoda byte arbitrari a debug.log (base64: anche UTF-8 non valido).
+		register_rest_route(
+			'dbdm-e2e/v1',
+			'/log-append',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => '__return_true',
+				'callback'            => function ( WP_REST_Request $request ) {
+					$bytes = base64_decode( (string) $request->get_param( 'base64' ), true );
+					file_put_contents( dbdm_e2e_paths()['log'], false === $bytes ? '' : $bytes, FILE_APPEND );
+					clearstatcache();
+					return rest_ensure_response( array( 'size' => filesize( dbdm_e2e_paths()['log'] ) ) );
+				},
+			)
+		);
 		register_rest_route(
 			'dbdm-e2e/v1',
 			'/deactivate',

@@ -15,21 +15,7 @@ $trigger_labels = array(
     DBDM_Snapshots::TRIGGER_UPGRADE   => array('Post-aggiornamento', 'success'),
 );
 
-// Messaggi di ripristino da transient.
-$restore_msgs = get_transient('dbdm_restore_msgs_' . get_current_user_id());
-if ($restore_msgs) {
-    delete_transient('dbdm_restore_msgs_' . get_current_user_id());
-}
 ?>
-
-<?php if (!empty($restore_msgs)): ?>
-    <?php foreach ($restore_msgs as $msg): ?>
-        <div class="db-ui-alert db-ui-alert-<?php echo $msg[0] === 'ok' ? 'success' : ($msg[0] === 'warn' ? 'warning' : 'danger'); ?>">
-            <span class="db-ui-alert-icon"><?php echo $msg[0] === 'ok' ? '✅' : ($msg[0] === 'warn' ? '⚠️' : '❌'); ?></span>
-            <span><?php echo esc_html($msg[1]); ?></span>
-        </div>
-    <?php endforeach; ?>
-<?php endif; ?>
 
 <div class="db-ui-alert db-ui-alert-info">
     <span class="db-ui-alert-icon">📸</span>

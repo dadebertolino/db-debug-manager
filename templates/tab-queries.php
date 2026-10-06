@@ -60,7 +60,7 @@ $monitor_left = DBDM_Queries::remaining(get_current_user_id());
             </div>
         <?php else: ?>
             <div class="dbdm-snap-meta">
-                <strong><?php esc_html_e('URL', 'db-debug-manager'); ?>:</strong> <code><?php echo esc_html($snapshot['url']); ?></code>
+                <strong><?php esc_html_e('URL', 'db-debug-manager'); ?>:</strong> <code><?php echo esc_html(DBDM_Log::to_utf8($snapshot['url'])); ?></code>
                 &nbsp;·&nbsp;
                 <strong><?php esc_html_e('Ora', 'db-debug-manager'); ?>:</strong> <?php echo esc_html($snapshot['time']); ?>
             </div>
@@ -87,8 +87,8 @@ $monitor_left = DBDM_Queries::remaining(get_current_user_id());
                     <tr class="<?php echo $slow ? 'dbdm-q-slow' : ''; ?>">
                         <td><?php echo (int) ($i + 1); ?></td>
                         <td><?php echo esc_html(number_format($time_ms, 2)); ?> ms</td>
-                        <td><code class="dbdm-q-sql"><?php echo esc_html($q['sql']); ?></code></td>
-                        <td><code class="dbdm-q-stack"><?php echo esc_html($q['stack']); ?></code></td>
+                        <td><code class="dbdm-q-sql"><?php echo esc_html(DBDM_Log::to_utf8($q['sql'])); ?></code></td>
+                        <td><code class="dbdm-q-stack"><?php echo esc_html(DBDM_Log::to_utf8($q['stack'])); ?></code></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

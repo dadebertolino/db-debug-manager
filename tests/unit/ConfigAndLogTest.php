@@ -166,4 +166,25 @@ class ConfigAndLogTest extends TestCase {
 			'log 0 stringa'             => array( true, '0', '/var/log/php-server.log', '{public}' ),
 		);
 	}
+
+	/**
+	 * Bug 44: un byte non UTF-8 rendeva vuoti viewer e risposta AJAX
+	 * (esc_html e json_encode restituiscono '' / false).
+	 */
+	public function test_testo_reso_utf8_valido(): void {
+		$latin = "caff\xE8 \xA8 ok";
+		$clean = DBDM_Log::to_utf8( $latin );
+
+		$this->assertSame( "caff\u{FFFD} \u{FFFD} ok", $clean );
+		$this->assertNotSame( '', esc_html( $clean ) );
+		$this->assertNotFalse( json_encode( $clean ) );
+		$this->assertSame( "già valido <b>&amp;</b>", DBDM_Log::to_utf8( "già valido <b>&amp;</b>" ), 'testo valido invariato, entità comprese' );
+	}
+
+	public function test_tail_restituisce_utf8_valido(): void {
+		$log = DBDM_Log::public_path();
+		file_put_contents( $log, "uno\ndue \xFF\n" );
+		$this->assertSame( "uno\ndue \u{FFFD}", DBDM_Log::tail( 10 ) );
+		unlink( $log );
+	}
 }
