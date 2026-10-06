@@ -120,6 +120,20 @@ class EmergencyCoreTest extends TestCase {
 		$this->assertSame( array(), $store );
 	}
 
+	/* --- Logout (bug 38) ---------------------------------------------------- */
+
+	public function test_logout_solo_in_post_con_token_valido(): void {
+		$store   = array();
+		$session = new DBDM_Em_Session( $store );
+		$token   = $session->csrf_token();
+		$post    = array( 'REQUEST_METHOD' => 'POST' );
+
+		$this->assertTrue( DBDM_Em_App::is_logout( new DBDM_Em_Request( array(), array( 'a' => 'logout', 'csrf' => $token ), $post ), $session ) );
+		$this->assertFalse( DBDM_Em_App::is_logout( new DBDM_Em_Request( array( 'a' => 'logout' ), array(), array( 'REQUEST_METHOD' => 'GET' ) ), $session ), 'GET (link o immagine da un altro sito)' );
+		$this->assertFalse( DBDM_Em_App::is_logout( new DBDM_Em_Request( array(), array( 'a' => 'logout', 'csrf' => 'altro' ), $post ), $session ), 'token non valido' );
+		$this->assertFalse( DBDM_Em_App::is_logout( new DBDM_Em_Request( array(), array( 'a' => 'clear_log', 'csrf' => $token ), $post ), $session ) );
+	}
+
 	/* --- Log degli accessi --------------------------------------------------- */
 
 	public function test_riga_del_log_degli_accessi(): void {
@@ -363,6 +377,7 @@ class EmergencyCoreTest extends TestCase {
 		} );
 		$this->assertStringContainsString( 'name="csrf" value="' . $store['dbdm_csrf'] . '"', $login );
 		$this->assertStringContainsString( 'Password errata.', $login );
+		$this->assertStringNotContainsString( 'a=logout', $login . $error );
 	}
 
 	public function test_il_token_del_login_e_quello_dopo_la_scadenza_della_sessione(): void {
@@ -405,7 +420,9 @@ class EmergencyCoreTest extends TestCase {
 		$this->assertStringContainsString( 'Plugin attivi (2)', $html );
 		$this->assertStringContainsString( 'Snapshot disponibili (1)', $html );
 		$this->assertStringContainsString( '2.0 KB', $html );
-		$this->assertSame( 2 + 4 + 2 + 1, substr_count( $html, 'name="csrf" value="' . $store['dbdm_csrf'] . '"' ), 'un token per ogni modulo' );
+		$this->assertSame( 1 + 2 + 4 + 2 + 1, substr_count( $html, 'name="csrf" value="' . $store['dbdm_csrf'] . '"' ), 'un token per ogni modulo' );
+		$this->assertStringNotContainsString( 'a=logout', $html, 'niente logout via GET (bug 38)' );
+		$this->assertSame( 1, preg_match( '#<form method="post"[^>]*>\s*<input type="hidden" name="csrf" value="[a-f0-9]{32}">\s*<input type="hidden" name="a" value="logout">#', $html ) );
 	}
 
 	/**

@@ -163,10 +163,9 @@ class DBDM_Em_App {
         $ip      = $request->ip($trust_proxy);
         $rl_key  = DBDM_Emergency_Guard::rate_key($ip);
         $logger  = new DBDM_Em_Logger($private_dir . 'emergency-access.log', $ip, $request->user_agent());
-        $action  = $request->action();
 
-        // Logout.
-        if ($action === 'logout') {
+        // Logout: solo con il modulo della dashboard (bug 38).
+        if (self::is_logout($request, $session)) {
             $session->clear();
             session_destroy();
             $this->redirect($request);
@@ -221,6 +220,15 @@ class DBDM_Em_App {
         $notices = self::handle_actions($request, $session, $actions, $logger);
 
         $view->dashboard($notices, DBDM_Em_Status::collect($repo, $config_path, $paths['content_dir'], $private_dir));
+    }
+
+    /**
+     * Richiesta di logout valida: POST con token CSRF. 2.0.0 (bug 38): un
+     * link o un'immagine su un altro sito non chiude più la sessione.
+     */
+    public static function is_logout(DBDM_Em_Request $request, DBDM_Em_Session $session) {
+        return $request->action() === 'logout' && $request->is_post()
+            && $session->csrf_check($request->post_string('csrf'));
     }
 
     /**

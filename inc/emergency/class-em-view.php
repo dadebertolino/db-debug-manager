@@ -80,7 +80,11 @@ class DBDM_Em_View {
             <small>Accesso diretto al sito senza WordPress · Sessione valida 30 min</small>
         </div>
         <div>
-            <a class="btn btn-sm" href="?a=logout">Logout</a>
+            <form method="post" style="display:inline;">
+                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES | ENT_SUBSTITUTE); ?>">
+                <input type="hidden" name="a" value="logout">
+                <button type="submit" class="btn btn-sm">Logout</button>
+            </form>
         </div>
     </div>
 
@@ -339,7 +343,7 @@ input:focus { outline:2px solid var(--primary); outline-offset:-1px; border-colo
 
     private function footer() {
         ?>
-<div class="footer">DB Debug Manager — Emergency Standalone · <a href="?a=logout" style="color:var(--muted);">Esci</a></div>
+<div class="footer">DB Debug Manager — Emergency Standalone</div>
 </body></html>
 <?php
     }

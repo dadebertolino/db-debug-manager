@@ -90,7 +90,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 35 | C | `emergency.php` | Mancano `X-Frame-Options`/`frame-ancestors`, `X-Robots-Tag`, `Cache-Control: no-store`; cookie `secure` non rilevato dietro proxy TLS; durata sessione PHP < 30 minuti | E |
 | 36 | C | `emergency.php` | Log accessi e file del rate limit senza rotazione; righe di log falsificabili con a capo | U/E |
 | 37 | C | `emergency.php:194` | Prima del login rivela se l'emergency è attivo, se c'è una password, se il DB risponde; mostra per intero l'error log del server | E |
-| 38 | C | `emergency.php:250` | Logout via GET senza CSRF | E |
+| 38 ✅ | C | `emergency.php:250` | Logout via GET senza CSRF | E |
 
 ### 2.3 Lato WordPress
 
