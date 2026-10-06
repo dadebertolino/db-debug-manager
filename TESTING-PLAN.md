@@ -191,6 +191,22 @@ funzioni non si possono testare. Prima dei test:
       lock, verifica dei byte, backup verificato prima di scrivere), lint
       con binario iniettabile e filtro per disattivarlo nei test.
 
+Ordine dei commit nel branch `fase-1-refactor`:
+
+1. [ ] refactor senza cambi di comportamento: `Request` (input tipizzato,
+       IP tramite `DBDM_Emergency_Guard`), `Session` (strict, epoca,
+       logout), `Csrf`, `Repository` (opzioni e transient via PDO), `Actions`
+       (una per azione, esito *cambiato / nessun effetto / errore*), `View`,
+       `App` (router); i 23 E2E esistenti invariati e verdi;
+2. [ ] unit sulle nuove classi; `Repository` e `Actions` su PDO SQLite in
+       memoria (disponibile in locale, MySQL no);
+3. [ ] bug dell'emergency, uno per commit con test rosso prima: 18–21, 27,
+       28, 30, 31, 33 (resto), 34–38;
+4. [ ] bug unit di costanti e log: 6, 7, 9, 50, 52.
+
+Restano alla Fase 2: 26 (multisite dell'emergency), 45–49, 51, 55, 56. Alla
+Fase 3: 43, 44, 53, 54, 57–59.
+
 Unit test (stima 150+): corpus di `wp-config.php` reali e patologici (bug
 1, 4, 5, 9, 10, 22–25, 31), writer e backup (2, 3), rate limit e finestra
 (11, 16, 29), IP e proxy, CSRF, sessione, `tail` e UTF-8 (52), JSON degli
@@ -277,15 +293,17 @@ Ogni flusso utente, nel browser e via HTTP diretto, su una matrice ampia.
 
 Proposte adottate in assenza di indicazioni diverse (da confermare):
 
-- [ ] **Posizione del debug log** (bug 41): attivando `WP_DEBUG_LOG` dal
+- [x] **Posizione del debug log** (bug 41): attivando `WP_DEBUG_LOG` dal
       pannello si scrive un percorso dentro la cartella privata; un percorso
       personalizzato già impostato viene rispettato.
-- [ ] **Monitor query** (bug 49): cattura solo le richieste di un admin
-      loggato, esclusi login e REST.
+- [x] **Monitor query** (bug 49): cattura solo le richieste
+      dell'amministratore loggato che ha attivato il monitor, esclusi login,
+      REST, AJAX e WP-CLI (confermato il 2026-10-06).
 - [x] **Requisito minimo WordPress**: 6.0 come gli altri plugin DB
       (confermato il 2026-10-06; primo commit della Fase A).
-- [ ] **Refactor di `emergency.php`**: classi includibili in `inc/emergency/`,
-      l'URL resta lo stesso.
+- [x] **Refactor di `emergency.php`**: classi includibili in `inc/emergency/`,
+      l'URL resta lo stesso. I bug B/C dell'emergency si correggono nella
+      stessa Fase 1, dopo il refactor (confermato il 2026-10-06).
 
 ### Fase A — fatta (→ 1.4.0)
 
