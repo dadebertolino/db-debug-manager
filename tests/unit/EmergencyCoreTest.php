@@ -1,0 +1,271 @@
+<?php
+/**
+ * Classi dell'emergency senza database: richiesta, sessione e CSRF, log
+ * degli accessi, stato del sito, cartella privata, pagine.
+ *
+ * @package DBDM\Tests
+ */
+
+use Yoast\PHPUnitPolyfills\TestCases\TestCase;
+
+class EmergencyCoreTest extends TestCase {
+
+	/** @var string */
+	private $dir;
+
+	protected function set_up() {
+		parent::set_up();
+		$this->dir = sys_get_temp_dir() . '/dbdm-em-core-' . uniqid();
+		mkdir( $this->dir );
+	}
+
+	protected function tear_down() {
+		$rm = function ( $dir ) use ( &$rm ) {
+			foreach ( array_diff( scandir( $dir ), array( '.', '..' ) ) as $item ) {
+				is_dir( "$dir/$item" ) ? $rm( "$dir/$item" ) : unlink( "$dir/$item" );
+			}
+			rmdir( $dir );
+		};
+		$rm( $this->dir );
+		parent::tear_down();
+	}
+
+	/* --- Richiesta ----------------------------------------------------------- */
+
+	public function test_azione_dal_post_prima_della_query_string_e_ripulita(): void {
+		$r = new DBDM_Em_Request( array( 'a' => 'logout' ), array( 'a' => 'clear_LOG<x>' ), array() );
+		$this->assertSame( 'clear_x', $r->action() );
+
+		$r = new DBDM_Em_Request( array( 'a' => 'logout' ), array(), array() );
+		$this->assertSame( 'logout', $r->action() );
+
+		$r = new DBDM_Em_Request( array( 'a' => array( 'logout' ) ), array(), array() );
+		$this->assertSame( '', $r->action() );
+	}
+
+	public function test_campi_post_tipizzati(): void {
+		$r = new DBDM_Em_Request(
+			array(),
+			array( 'csrf' => array( 'x' ), 'plugin' => 'a/a.php', 'enable' => '1', 'off' => '0' ),
+			array( 'REQUEST_METHOD' => 'POST' )
+		);
+		$this->assertTrue( $r->is_post() );
+		$this->assertTrue( $r->has_post( 'csrf' ) );
+		$this->assertSame( '', $r->post_string( 'csrf' ) );
+		$this->assertSame( 'a/a.php', $r->post_string( 'plugin' ) );
+		$this->assertSame( '', $r->post_string( 'assente' ) );
+		$this->assertTrue( $r->post_flag( 'enable' ) );
+		$this->assertFalse( $r->post_flag( 'off' ) );
+		$this->assertFalse( ( new DBDM_Em_Request( array(), array(), array( 'REQUEST_METHOD' => 'GET' ) ) )->is_post() );
+	}
+
+	public function test_percorsi_ip_e_https(): void {
+		$r = new DBDM_Em_Request(
+			array(),
+			array(),
+			array(
+				'REQUEST_URI'          => '/wp-content/plugins/db-debug-manager/emergency.php?a=logout&x=1',
+				'SCRIPT_NAME'          => '/wp-content/plugins/db-debug-manager/emergency.php',
+				'REMOTE_ADDR'          => '10.0.0.1',
+				'HTTP_X_FORWARDED_FOR' => '198.51.100.7',
+				'HTTPS'                => 'on',
+			)
+		);
+		$this->assertSame( '/wp-content/plugins/db-debug-manager/emergency.php', $r->path() );
+		$this->assertSame( '/wp-content/plugins/db-debug-manager/', $r->script_dir() );
+		$this->assertSame( '10.0.0.1', $r->ip( false ) );
+		$this->assertSame( '198.51.100.7', $r->ip( true ) );
+		$this->assertTrue( $r->is_https() );
+		$this->assertSame( '-', $r->user_agent() );
+	}
+
+	/* --- Sessione e CSRF ----------------------------------------------------- */
+
+	public function test_token_csrf_stabile_e_confronto_rigoroso(): void {
+		$store   = array();
+		$session = new DBDM_Em_Session( $store );
+		$token   = $session->csrf_token();
+
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{32}$/', $token );
+		$this->assertSame( $token, $session->csrf_token() );
+		$this->assertSame( $token, $store['dbdm_csrf'], 'scritto nell\'array della sessione' );
+		$this->assertTrue( $session->csrf_check( $token ) );
+		$this->assertFalse( $session->csrf_check( '' ) );
+		$this->assertFalse( $session->csrf_check( strtoupper( $token ) ) );
+		$this->assertFalse( $session->csrf_check( array( $token ) ) );
+
+		$empty = array();
+		$this->assertFalse( ( new DBDM_Em_Session( $empty ) )->csrf_check( '' ), 'senza token in sessione' );
+	}
+
+	public function test_login_e_scadenza_dopo_30_minuti(): void {
+		$store   = array();
+		$session = new DBDM_Em_Session( $store );
+		$session->csrf_token();
+		$this->assertFalse( $session->is_authed( 'fp', 1000 ) );
+
+		$session->login( 'fp', 1000 );
+		$this->assertArrayNotHasKey( 'dbdm_csrf', $store, 'il token del login non vale più' );
+		$this->assertTrue( $session->is_authed( 'fp', 1000 + 1800 ) );
+		$this->assertFalse( $session->is_authed( 'fp', 1000 + 1801 ) );
+		$this->assertSame( array(), $store, 'sessione scaduta svuotata' );
+	}
+
+	public function test_impronta_cambiata_chiude_la_sessione(): void {
+		$store   = array();
+		$session = new DBDM_Em_Session( $store );
+		$session->login( 'vecchia', 1000 );
+
+		$this->assertFalse( $session->is_authed( 'nuova', 1001 ) );
+		$this->assertSame( array(), $store );
+	}
+
+	/* --- Log degli accessi --------------------------------------------------- */
+
+	public function test_riga_del_log_degli_accessi(): void {
+		$file   = $this->dir . '/emergency-access.log';
+		$logger = new DBDM_Em_Logger( $file, '203.0.113.5', str_repeat( 'u', 200 ) );
+		$logger->log( 'LOGIN_FAIL', '', 0 );
+		$logger->log( 'ACTION', 'clear_transients: 3', 60 );
+
+		$lines = file( $file, FILE_IGNORE_NEW_LINES );
+		$this->assertSame( '[1970-01-01 00:00:00] LOGIN_FAIL | IP=203.0.113.5 | UA=' . str_repeat( 'u', 120 ) . ' | ', $lines[0] );
+		$this->assertStringEndsWith( '| clear_transients: 3', $lines[1] );
+	}
+
+	/* --- Stato del sito ------------------------------------------------------ */
+
+	public function test_percorso_del_debug_log(): void {
+		$config = $this->dir . '/wp-config.php';
+		file_put_contents( $config, "<?php\ndefine( 'WP_DEBUG_LOG', true );\n" );
+		$this->assertSame( '/wp-content/debug.log', DBDM_Em_Status::debug_log_path( $config, '/wp-content' ) );
+
+		file_put_contents( $config, "<?php\ndefine( 'WP_DEBUG_LOG', '/srv/log/wp.log' );\n" );
+		$this->assertSame( '/srv/log/wp.log', DBDM_Em_Status::debug_log_path( $config, '/wp-content' ) );
+
+		$this->assertSame( '/wp-content/debug.log', DBDM_Em_Status::debug_log_path( $this->dir . '/assente.php', '/wp-content' ) );
+	}
+
+	public function test_coda_di_un_file(): void {
+		$file = $this->dir . '/x.log';
+		file_put_contents( $file, 'abcdefghij' );
+		$this->assertSame( 'ghij', DBDM_Em_Status::tail_bytes( $file, 4 ) );
+		$this->assertSame( 'abcdefghij', DBDM_Em_Status::tail_bytes( $file, 100 ) );
+		$this->assertSame( '', DBDM_Em_Status::tail_bytes( $this->dir . '/assente.log', 4 ) );
+	}
+
+	public function test_stato_delle_costanti(): void {
+		$status = DBDM_Em_Status::constants_status(
+			"<?php\ndefine( 'WP_DEBUG', true );\ndefine('WP_DEBUG_DISPLAY', false);\ndefine( 'WP_DEBUG_LOG', '/srv/wp.log' );\ndefine( 'SAVEQUERIES', '' );\n"
+		);
+		$this->assertSame(
+			array(
+				'WP_DEBUG'         => true,
+				'WP_DEBUG_LOG'     => true,
+				'WP_DEBUG_DISPLAY' => false,
+				'SCRIPT_DEBUG'     => null,
+				'SAVEQUERIES'      => false,
+			),
+			$status
+		);
+		$this->assertSame( array_fill_keys( DBDM_Em_Status::MANAGED_CONSTANTS, null ), DBDM_Em_Status::constants_status( false ) );
+	}
+
+	public function test_snapshot_dal_piu_recente(): void {
+		$file = $this->dir . '/snapshots.json';
+		$this->assertSame( array(), DBDM_Em_Status::snapshots( $file ) );
+
+		file_put_contents( $file, '[{"id":"a"},{"id":"b"}]' );
+		$this->assertSame( array( array( 'id' => 'b' ), array( 'id' => 'a' ) ), DBDM_Em_Status::snapshots( $file ) );
+
+		file_put_contents( $file, '{rotto' );
+		$this->assertSame( array(), DBDM_Em_Status::snapshots( $file ) );
+	}
+
+	/* --- Cartella privata ---------------------------------------------------- */
+
+	public function test_cartella_privata_dal_percorso_o_dal_token(): void {
+		$token = 'abcdef0123456789';
+		$dir   = $this->dir . '/dbdm-private-' . $token;
+		mkdir( $dir );
+
+		$this->assertSame( $dir . '/', DBDM_Em_App::resolve_private_dir( $dir, '', $this->dir ) );
+		$this->assertSame( $dir . '/', DBDM_Em_App::resolve_private_dir( $dir . '/', '', $this->dir ) );
+		$this->assertSame( $dir . '/', DBDM_Em_App::resolve_private_dir( '', $token, $this->dir ) );
+		$this->assertSame( $dir . '/', DBDM_Em_App::resolve_private_dir( '/non/esiste/dbdm-private-' . $token, $token, $this->dir ), 'ripiego sul token' );
+	}
+
+	public function test_cartella_privata_manomessa_o_assente(): void {
+		mkdir( $this->dir . '/altra' );
+		$this->assertSame( '', DBDM_Em_App::resolve_private_dir( $this->dir . '/altra', '', $this->dir ), 'nome non valido' );
+		$this->assertSame( '', DBDM_Em_App::resolve_private_dir( '', '../../etc', $this->dir ), 'token non valido' );
+		$this->assertSame( '', DBDM_Em_App::resolve_private_dir( '', 'abcdef0123456789', $this->dir ), 'cartella assente' );
+		$this->assertSame( '', DBDM_Em_App::resolve_private_dir( array(), null, $this->dir ) );
+	}
+
+	/* --- Pagine -------------------------------------------------------------- */
+
+	private function render( callable $fn ) {
+		ob_start();
+		$fn();
+		return ob_get_clean();
+	}
+
+	public function test_pagine_con_output_escapato_e_token_della_sessione(): void {
+		$store = array();
+		$view  = new DBDM_Em_View( new DBDM_Em_Session( $store ) );
+
+		$error = $this->render( function () use ( $view ) {
+			$view->error( '<script>x</script>' );
+		} );
+		$this->assertStringStartsWith( '<!DOCTYPE html>', $error );
+		$this->assertStringContainsString( '&lt;script&gt;x&lt;/script&gt;', $error );
+
+		$login = $this->render( function () use ( $view ) {
+			$view->login( 'Password errata.' );
+		} );
+		$this->assertStringContainsString( 'name="csrf" value="' . $store['dbdm_csrf'] . '"', $login );
+		$this->assertStringContainsString( 'Password errata.', $login );
+	}
+
+	public function test_il_token_del_login_e_quello_dopo_la_scadenza_della_sessione(): void {
+		$store   = array();
+		$session = new DBDM_Em_Session( $store );
+		$view    = new DBDM_Em_View( $session );
+		$session->csrf_token();
+		$session->login( 'fp', 1000 );
+		$session->is_authed( 'fp', 9999 ); // Scaduta: sessione svuotata.
+
+		$login = $this->render( function () use ( $view ) {
+			$view->login();
+		} );
+		$this->assertTrue( $session->csrf_check( preg_match( '/name="csrf" value="([a-f0-9]+)"/', $login, $m ) ? $m[1] : '' ) );
+	}
+
+	public function test_dashboard(): void {
+		$store = array();
+		$view  = new DBDM_Em_View( new DBDM_Em_Session( $store ) );
+		$html  = $this->render( function () use ( $view ) {
+			$view->dashboard(
+				array( array( 'ok', 'Fatto.' ), array( 'err', 'No <b>' ) ),
+				array(
+					'log_content'     => "PHP Notice: <img src=x>\n",
+					'log_size'        => 2048,
+					'active_plugins'  => array( 'a/a.php', 'b/b.php' ),
+					'cur_theme'       => 'twentytwentyfive',
+					'consts_status'   => array( 'WP_DEBUG' => true, 'SAVEQUERIES' => null ),
+					'php_error_log'   => '',
+					'php_log_content' => '',
+					'snapshots'       => array( array( 'id' => 'snap_1', 'trigger' => 'manual', 'timestamp' => 0, 'active_plugins' => array( 'a/a.php' ), 'stylesheet' => 'tt', 'note' => 'nota' ) ),
+				)
+			);
+		} );
+		$this->assertStringContainsString( '<div class="notice notice-ok">Fatto.</div>', $html );
+		$this->assertStringContainsString( '<div class="notice notice-err">No &lt;b&gt;</div>', $html );
+		$this->assertStringContainsString( 'PHP Notice: &lt;img src=x&gt;', $html );
+		$this->assertStringContainsString( 'Plugin attivi (2)', $html );
+		$this->assertStringContainsString( 'Snapshot disponibili (1)', $html );
+		$this->assertStringContainsString( '2.0 KB', $html );
+		$this->assertSame( 2 + 4 + 2 + 1, substr_count( $html, 'name="csrf" value="' . $store['dbdm_csrf'] . '"' ), 'un token per ogni modulo' );
+	}
+}
