@@ -30,9 +30,33 @@ const DBDM_E2E_PASSWORD   = 'Emergenza-E2E-2026';
 const DBDM_E2E_DIR_TOKEN  = '0123456789abcdef';
 const DBDM_E2E_CONSTANTS  = array( 'WP_DEBUG', 'WP_DEBUG_LOG', 'WP_DEBUG_DISPLAY', 'SCRIPT_DEBUG', 'SAVEQUERIES' );
 
+const DBDM_E2E_BROKEN_PLUGIN = 'dbdm-e2e-rotto/dbdm-e2e-rotto.php';
+const DBDM_E2E_BROKEN_THEME  = 'dbdm-e2e-tema-rotto';
+
 /**
- * Costanti di debug della richiesta corrente, per la lettura "dall'esterno".
+ * "Sito rotto": il plugin o il tema di prova vanno in fatal a ogni
+ * richiesta. Le richieste della fixture (REST dbdm-e2e, lettura delle
+ * costanti) li escludono, così si può sempre leggere lo stato e ripulire.
+ * Il mu-plugin si carica prima di plugin e tema.
  */
+// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+if ( isset( $_GET['dbdm_e2e_constants'] ) || ( isset( $_GET['rest_route'] ) && 0 === strpos( (string) $_GET['rest_route'], '/dbdm-e2e/' ) ) ) {
+	add_filter(
+		'option_active_plugins',
+		function ( $plugins ) {
+			return array_values( array_diff( (array) $plugins, array( DBDM_E2E_BROKEN_PLUGIN ) ) );
+		}
+	);
+	foreach ( array( 'stylesheet', 'template' ) as $dbdm_e2e_option ) {
+		add_filter(
+			'option_' . $dbdm_e2e_option,
+			function ( $value ) {
+				return DBDM_E2E_BROKEN_THEME === $value ? WP_DEFAULT_THEME : $value;
+			}
+		);
+	}
+}
+
 /**
  * Un avviso PHP su richiesta: finisce nel debug.log attivo (per verificare
  * dove WordPress scrive il log).
@@ -168,6 +192,26 @@ function dbdm_e2e_rmdir( $dir ) {
 }
 
 /**
+ * Legge (un argomento) o scrive (due) un'opzione direttamente nel database,
+ * senza filtri né cache.
+ *
+ * @param string $name
+ * @param mixed  ...$value
+ * @return mixed Valore grezzo letto.
+ */
+function dbdm_e2e_raw_option( $name, ...$value ) {
+	global $wpdb;
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery
+	if ( $value ) {
+		$wpdb->update( $wpdb->options, array( 'option_value' => maybe_serialize( $value[0] ) ), array( 'option_name' => $name ) );
+		wp_cache_delete( $name, 'options' );
+		wp_cache_delete( 'alloptions', 'options' );
+	}
+	return $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $name ) );
+	// phpcs:enable
+}
+
+/**
  * Riporta il sito a uno stato noto.
  *
  * $args (tutti opzionali):
@@ -180,6 +224,8 @@ function dbdm_e2e_rmdir( $dir ) {
  *               (richiede emergency, che la crea).
  *  - themes     string[] Temi di prova da creare: 'orfano' (child theme il
  *               cui padre non esiste). Rimossi a ogni reset.
+ *  - broken     string  'plugin' o 'theme': sito in fatal a ogni richiesta
+ *               per colpa di un plugin attivo o del tema attivo.
  *
  * @param array $args
  * @return array|WP_Error Stato risultante (vedi dbdm_e2e_state()).
@@ -230,6 +276,19 @@ function dbdm_e2e_reset( $args = array() ) {
 		activate_plugin( 'db-debug-manager/db-debug-manager.php' );
 	}
 
+	// Plugin rotto: tolto da quelli attivi e cancellato. Lettura e scrittura
+	// sul database: in questa richiesta i filtri qui sopra lo nascondono.
+	$active = array_values( array_diff( (array) maybe_unserialize( dbdm_e2e_raw_option( 'active_plugins' ) ), array( DBDM_E2E_BROKEN_PLUGIN ) ) );
+	dbdm_e2e_raw_option( 'active_plugins', $active );
+	dbdm_e2e_rmdir( WP_PLUGIN_DIR . '/' . dirname( DBDM_E2E_BROKEN_PLUGIN ) );
+	wp_clean_plugins_cache( false );
+
+	// Tema predefinito (un'azione dell'emergency può averlo cambiato).
+	if ( wp_get_theme( WP_DEFAULT_THEME )->exists() ) {
+		dbdm_e2e_raw_option( 'template', WP_DEFAULT_THEME );
+		dbdm_e2e_raw_option( 'stylesheet', WP_DEFAULT_THEME );
+	}
+
 	// Temi di prova.
 	foreach ( glob( get_theme_root() . '/dbdm-e2e-*', GLOB_ONLYDIR ) ?: array() as $dir ) {
 		dbdm_e2e_rmdir( $dir );
@@ -237,6 +296,27 @@ function dbdm_e2e_reset( $args = array() ) {
 	if ( isset( $args['themes'] ) && in_array( 'orfano', (array) $args['themes'], true ) ) {
 		wp_mkdir_p( get_theme_root() . '/dbdm-e2e-orfano' );
 		file_put_contents( get_theme_root() . '/dbdm-e2e-orfano/style.css', "/*\nTheme Name: DBDM E2E Orfano\nTemplate: dbdm-e2e-padre-cancellato\n*/\n" );
+	}
+
+	// Sito rotto: scritto direttamente nelle opzioni, come dopo un
+	// aggiornamento andato male (activate_plugin() andrebbe in fatal qui).
+	$broken = isset( $args['broken'] ) ? (string) $args['broken'] : '';
+	if ( 'plugin' === $broken ) {
+		wp_mkdir_p( WP_PLUGIN_DIR . '/' . dirname( DBDM_E2E_BROKEN_PLUGIN ) );
+		file_put_contents(
+			WP_PLUGIN_DIR . '/' . DBDM_E2E_BROKEN_PLUGIN,
+			"<?php\n/*\nPlugin Name: DBDM E2E rotto\n*/\ndbdm_e2e_funzione_inesistente_del_plugin();\n"
+		);
+		$active[] = DBDM_E2E_BROKEN_PLUGIN;
+		dbdm_e2e_raw_option( 'active_plugins', $active );
+	} elseif ( 'theme' === $broken ) {
+		$dir = get_theme_root() . '/' . DBDM_E2E_BROKEN_THEME;
+		wp_mkdir_p( $dir );
+		file_put_contents( $dir . '/style.css', "/*\nTheme Name: DBDM E2E tema rotto\n*/\n" );
+		file_put_contents( $dir . '/index.php', "<?php\n" );
+		file_put_contents( $dir . '/functions.php', "<?php\ndbdm_e2e_funzione_inesistente_del_tema();\n" );
+		dbdm_e2e_raw_option( 'template', DBDM_E2E_BROKEN_THEME );
+		dbdm_e2e_raw_option( 'stylesheet', DBDM_E2E_BROKEN_THEME );
 	}
 
 	// Accesso d'emergenza.
