@@ -44,6 +44,47 @@ class PrivateDirAndSettingsTest extends TestCase {
 		$this->assertSame( $dir, DBDM_Emergency::private_dir() );
 	}
 
+	/**
+	 * Bug 21: l'emergency ricavava wp-content, temi e plugin dalla propria
+	 * posizione. WordPress salva i percorsi veri insieme alla cartella privata.
+	 */
+	public function test_percorsi_del_sito_salvati_per_l_emergency(): void {
+		DBDM_Emergency::private_dir();
+
+		$this->assertSame(
+			array(
+				'content_dir' => WP_CONTENT_DIR,
+				'plugins_dir' => WP_CONTENT_DIR . '/plugins',
+				'themes_dir'  => WP_CONTENT_DIR . '/temi-registrati',
+			),
+			get_option( DBDM_Emergency::OPTION_SITE_PATHS )
+		);
+	}
+
+	public function test_svuota_log_degli_accessi_anche_la_copia_ruotata(): void {
+		$log = DBDM_Emergency::log_path();
+		file_put_contents( $log, "riga\n" );
+		file_put_contents( $log . '.1', "vecchia\n" );
+
+		DBDM_Emergency::clear_log();
+
+		$this->assertFileDoesNotExist( $log );
+		$this->assertFileDoesNotExist( $log . '.1' );
+	}
+
+	/**
+	 * Bug 60: la regola Nginx suggerita proteggeva la vecchia cartella
+	 * dentro il plugin; dalla 1.4.0 i file stanno in wp-content/dbdm-private-*.
+	 */
+	public function test_regola_nginx_sulla_cartella_privata(): void {
+		$this->assertSame( 'location ^~ /wp-content/dbdm-private- { deny all; }', DBDM_Emergency::nginx_rule() );
+
+		add_filter( 'content_url', function () {
+			return 'https://debug.example/app/contenuti';
+		} );
+		$this->assertSame( 'location ^~ /app/contenuti/dbdm-private- { deny all; }', DBDM_Emergency::nginx_rule() );
+	}
+
 	public function test_migrazione_dalla_cartella_del_plugin(): void {
 		$token = 'abcdef0123456789';
 		update_option( DBDM_Emergency::OPTION_DIR_TOKEN, $token );

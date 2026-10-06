@@ -107,6 +107,12 @@ class DBDM_Emergency {
     const OPTION_DIR_TOKEN   = 'dbdm_private_dir_token';
     /** Percorso assoluto della cartella privata, letto da emergency.php (1.4.0). */
     const OPTION_DIR_PATH    = 'dbdm_private_dir_path';
+    /**
+     * wp-content, plugin e temi come li vede WordPress, letti da
+     * emergency.php (2.0.0): WP_CONTENT_DIR può essere un'espressione che
+     * l'emergency non sa valutare.
+     */
+    const OPTION_SITE_PATHS  = 'dbdm_site_paths';
 
     /**
      * Path della cartella privata (con trailing slash), garantendone
@@ -135,7 +141,34 @@ class DBDM_Emergency {
         if (get_option(self::OPTION_DIR_PATH) !== $dir) {
             update_option(self::OPTION_DIR_PATH, $dir, false);
         }
+        $paths = self::site_paths();
+        if (get_option(self::OPTION_SITE_PATHS) !== $paths) {
+            update_option(self::OPTION_SITE_PATHS, $paths, false);
+        }
         return $dir . '/';
+    }
+
+    /**
+     * Regola Nginx che nega l'accesso HTTP alle cartelle private (dove
+     * .htaccess non vale). 2.0.0 (bug 60): prima indicava la vecchia
+     * posizione dentro la cartella del plugin.
+     */
+    public static function nginx_rule() {
+        $path = wp_parse_url(content_url(), PHP_URL_PATH);
+        return 'location ^~ ' . rtrim(is_string($path) ? $path : '/wp-content', '/') . '/dbdm-private- { deny all; }';
+    }
+
+    /**
+     * Percorsi del sito per emergency.php.
+     *
+     * @return array{content_dir:string,plugins_dir:string,themes_dir:string}
+     */
+    public static function site_paths() {
+        return array(
+            'content_dir' => WP_CONTENT_DIR,
+            'plugins_dir' => defined('WP_PLUGIN_DIR') ? WP_PLUGIN_DIR : WP_CONTENT_DIR . '/plugins',
+            'themes_dir'  => function_exists('get_theme_root') ? get_theme_root() : WP_CONTENT_DIR . '/themes',
+        );
     }
 
     /**
@@ -208,6 +241,7 @@ class DBDM_Emergency {
 
     public static function clear_log() {
         @unlink(self::log_path());
+        @unlink(self::log_path() . '.1'); // Copia ruotata da emergency.php (2.0.0).
         @unlink(self::rate_limit_path());
     }
 

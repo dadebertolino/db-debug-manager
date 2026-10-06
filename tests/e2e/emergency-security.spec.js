@@ -54,7 +54,10 @@ test.describe( 'credenziali e cartella privata', () => {
 
 		const res = await request.get( EMERGENCY_URL );
 
-		expect( await res.text() ).toContain( 'Cartella privata del plugin non trovata' );
+		// Bug 37: nessun dettaglio prima del login (il motivo va nel log di PHP).
+		const body = await res.text();
+		expect( body ).toContain( 'Accesso d&#039;emergenza non disponibile.' );
+		expect( body ).not.toContain( 'Cartella privata' );
 		expect( ( await getState( request ) ).private ).toEqual( {} );
 	} );
 } );
@@ -104,7 +107,8 @@ test.describe( 'sessione', () => {
 		expect( state.plugin_active ).toBe( false );
 		await page.reload();
 
-		await expect( page.getByText( 'L\'accesso emergency è disattivato' ) ).toBeVisible();
+		await expect( page.getByText( 'Accesso d\'emergenza non disponibile.' ) ).toBeVisible();
+		expect( state.options.dbdm_emergency_enabled ).toBe( '' );
 		await resetState( request );
 		expect( ( await getState( request ) ).plugin_active ).toBe( true );
 	} );

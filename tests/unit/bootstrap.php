@@ -210,6 +210,36 @@ if ( ! function_exists( '_doing_it_wrong' ) ) {
 	}
 }
 
+/* --- Errori e permessi sui file ------------------------------------------ */
+
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error { // phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
+		public $code;
+		public $message;
+		public function __construct( $code = '', $message = '' ) {
+			$this->code    = $code;
+			$this->message = $message;
+		}
+		public function get_error_code() {
+			return $this->code;
+		}
+		public function get_error_message() {
+			return $this->message;
+		}
+	}
+}
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $thing ) {
+		return $thing instanceof WP_Error;
+	}
+}
+if ( ! function_exists( 'wp_is_file_mod_allowed' ) ) {
+	// Come WordPress: DISALLOW_FILE_MODS, poi il filtro file_mod_allowed.
+	function wp_is_file_mod_allowed( $context ) {
+		return apply_filters( 'file_mod_allowed', ! defined( 'DISALLOW_FILE_MODS' ) || ! DISALLOW_FILE_MODS, $context );
+	}
+}
+
 /* --- i18n ----------------------------------------------------------------- */
 
 if ( ! function_exists( '__' ) ) {
@@ -349,6 +379,11 @@ if ( ! function_exists( 'wp_parse_args' ) ) {
 if ( ! function_exists( 'home_url' ) ) {
 	function home_url( $path = '' ) {
 		return 'https://debug.example' . ( $path ? '/' . ltrim( $path, '/' ) : '' );
+	}
+}
+if ( ! function_exists( 'content_url' ) ) {
+	function content_url( $path = '' ) {
+		return apply_filters( 'content_url', home_url( 'wp-content' . ( $path ? '/' . ltrim( $path, '/' ) : '' ) ), $path );
 	}
 }
 if ( ! function_exists( 'site_url' ) ) {
@@ -508,6 +543,12 @@ if ( ! function_exists( 'wp_normalize_path' ) ) {
 		return preg_replace( '|(?<=.)/+|', '/', str_replace( '\\', '/', (string) $path ) );
 	}
 }
+if ( ! function_exists( 'get_theme_root' ) ) {
+	// Diversa da WP_CONTENT_DIR/themes: i test vedono quale percorso è usato.
+	function get_theme_root() {
+		return WP_CONTENT_DIR . '/temi-registrati';
+	}
+}
 if ( ! function_exists( 'size_format' ) ) {
 	function size_format( $bytes, $decimals = 0 ) {
 		return $bytes . ' B';
@@ -574,9 +615,10 @@ function dbdm_test_set_static( $class, $property, $value ) {
 }
 
 // Carica i sorgenti sotto test: le classi sono solo definizioni, nessun
-// codice viene eseguito al require. emergency.php e db-debug-manager.php no:
-// eseguono codice al caricamento.
-foreach ( glob( DBDM_TEST_ROOT . '/inc/class-*.php' ) as $dbdm_file ) {
+// codice viene eseguito al require (anche le classi dell'emergency in
+// inc/emergency/). emergency.php e db-debug-manager.php no: eseguono codice
+// al caricamento.
+foreach ( array_merge( glob( DBDM_TEST_ROOT . '/inc/class-*.php' ), glob( DBDM_TEST_ROOT . '/inc/emergency/class-*.php' ) ) as $dbdm_file ) {
 	require_once $dbdm_file;
 }
 

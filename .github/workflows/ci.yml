@@ -83,6 +83,8 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
+          # pdo_sqlite: le azioni dell'emergency si provano su SQLite in memoria.
+          extensions: pdo_sqlite
           tools: composer
           coverage: none
 

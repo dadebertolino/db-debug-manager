@@ -53,10 +53,10 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 3 ✅ | A | `class-config.php:87` | Il backup viene rifatto a ogni costante (5 per salvataggio): non contiene lo stato prima del salvataggio; se la cartella privata non è scrivibile la copia fallisce in silenzio e la scrittura procede senza backup; salvataggio non atomico tra costanti | U + I |
 | 4 ✅ | A | `class-standalone-config.php:101` | Define con commento in coda, `defined() \|\| define()`, `if (!defined) define`, define su più righe, copia commentata prima di quella attiva, define in un file incluso: viene **inserito un duplicato**. Il toggle non ha effetto, l'admin vede "salvate", PHP 8 emette "already defined" a ogni richiesta | U (tabella di varianti, una sola define attiva col valore atteso) + I |
 | 5 ✅ | B | `class-standalone-config.php:115` | Senza il marker "That's all" e con `require` (non `_once`) o indentato, la define finisce dopo `wp-settings.php`: nessun effetto | U |
-| 6 | B | `tab-config.php:64` | `define('WP_DEBUG', 1)` mostrato come spento; salvando un'altra costante si scrive `false` | U/I |
-| 7 | B | `class-log.php:16`, `tab-config.php:64` | `WP_DEBUG_LOG` `'true'`/`'1'` trattato come percorso di file (il core lo intende come `wp-content/debug.log`); `ini error_log` ignorato | U |
+| 6 ✅ | B | `tab-config.php:64` | `define('WP_DEBUG', 1)` mostrato come spento; salvando un'altra costante si scrive `false` | U/I |
+| 7 ½ | B | `class-log.php:16`, `tab-config.php:64` | `WP_DEBUG_LOG` `'true'`/`'1'` trattato come percorso di file (il core lo intende come `wp-content/debug.log`); `ini error_log` ignorato | U |
 | 8 ✅ | B | `class-admin.php:98` | Ogni salvataggio scrive tutte e 5 le costanti; su un sito pulito `WP_DEBUG_DISPLAY` risulta già spuntato (default del core) e finisce scritto `true`: errori visibili ai visitatori | E |
-| 9 | C | `class-standalone-config.php`, `class-config.php:142` | CRLF convertiti in LF sulla riga modificata; nome costante case-insensitive; `addslashes` in una stringa a virgolette singole | U |
+| 9 ✅ | C | `class-standalone-config.php`, `class-config.php:142` | CRLF convertiti in LF sulla riga modificata; nome costante case-insensitive; `addslashes` in una stringa a virgolette singole | U |
 
 ### 2.2 Accesso d'emergenza (`emergency.php`)
 
@@ -70,27 +70,27 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 15 ✅ | A | `emergency.php:51,239` | Senza token valido si ricade su `private/` prevedibile, dove finisce il backup di `wp-config.php` (credenziali DB): scaricabile su Nginx. Accade dopo un aggiornamento via FTP prima di aprire il pannello | E |
 | 16 ✅ | A | `emergency.php:91` | Con "fidati del proxy" attivo `CF-Connecting-IP` è accettato anche senza Cloudflare: tentativi infiniti cambiando header; IPv6 per indirizzo esatto | U + E |
 | 17 ✅ | A | `emergency.php:417-442` | Ripristino snapshot senza validazione: percorsi `../`, cartelle, non-stringhe; il tema padre (`template`) non viene verificato → sito bianco | I + E |
-| 18 | B | `emergency.php:807` | Iniezione JS nel `confirm()` del pulsante "Disattiva" (slug con apostrofo) | E |
-| 19 | B | `emergency.php:826,840` | Pannelli del log vuoti con UTF-8 non valido (taglio a metà carattere, Latin-1) | E |
-| 20 | B | `emergency.php:363` | Il toggle `WP_DEBUG_LOG` dall'emergency perde il percorso personalizzato (il pannello lo conserva) | E |
-| 21 | B | `emergency.php:379,475,327` | Percorsi fissi: `wp-content/debug.log`, cartella temi; ignorati `WP_DEBUG_LOG` stringa e `WP_CONTENT_DIR` | U/E |
+| 18 ✅ | B | `emergency.php:807` | Iniezione JS nel `confirm()` del pulsante "Disattiva" (slug con apostrofo) | E |
+| 19 ✅ | B | `emergency.php:826,840` | Pannelli del log vuoti con UTF-8 non valido (taglio a metà carattere, Latin-1) | E |
+| 20 ✅ | B | `emergency.php:363` | Il toggle `WP_DEBUG_LOG` dall'emergency perde il percorso personalizzato (il pannello lo conserva) | E |
+| 21 ✅ | B | `emergency.php:379,475,327` | Percorsi fissi: `wp-content/debug.log`, cartella temi; ignorati `WP_DEBUG_LOG` stringa e `WP_CONTENT_DIR` | U/E |
 | 22 ✅ | B | `class-standalone-config.php:62,82` | Define in commenti o condizionali possono sovrascrivere le credenziali (vince l'ultima, in PHP la prima); stesso per `$table_prefix` | U |
 | 23 ✅ | B | `class-standalone-config.php:68` | Backslash nelle password alterati (`stripslashes`); valori con `);` troncati | U |
 | 24 ✅ | B | `class-standalone-config.php:231` | `DB_HOST` con socket o IPv6 interpretato male | U |
 | 25 ✅ | B | `class-standalone-config.php:19` | `wp-config.php` sopra la root di WordPress o plugin in symlink: non trovato | U |
 | 26 | B | `emergency.php:301` | Multisite ignorato: plugin attivi in rete, temi e transient degli altri siti | I (multisite) + E |
-| 27 | B | — | Con object cache persistente (Redis/Memcached) le azioni scrivono nel DB ma il sito continua a usare i valori in cache: nessun avviso | U (rilevamento del drop-in) |
-| 28 | B | `emergency.php:330` | "Cambia a tema default" può scegliere il tema attivo (rotto) o un child theme | I + E |
+| 27 ✅ | B | — | Con object cache persistente (Redis/Memcached) le azioni scrivono nel DB ma il sito continua a usare i valori in cache: nessun avviso | U (rilevamento del drop-in) |
+| 28 ✅ | B | `emergency.php:330` | "Cambia a tema default" può scegliere il tema attivo (rotto) o un child theme | I + E |
 | 29 ✅ | B | `emergency.php:138,155` | Il blocco conta dal primo errore, non dal quinto: finestra più corta del dichiarato | U (orologio iniettabile) |
-| 30 | B | `emergency.php:297` e azioni | Successo riportato anche quando nulla cambia (plugin non attivo, opzione mancante); token CSRF scaduto ignorato senza avviso | E |
-| 31 | B | `emergency.php:505` | Stato delle costanti letto male (`1`, `getenv`, condizionali) | U |
+| 30 ✅ | B | `emergency.php:297` e azioni | Successo riportato anche quando nulla cambia (plugin non attivo, opzione mancante); token CSRF scaduto ignorato senza avviso | E |
+| 31 ✅ | B | `emergency.php:505` | Stato delle costanti letto male (`1`, `getenv`, condizionali) | U |
 | 32 ✅ | C | `emergency.php:217,312,494` | `unserialize()` senza `allowed_classes => false` | U |
-| 33 ½ | C | `emergency.php:178` e altri | `csrf`/`password` inviati come array → TypeError, pagina 500 (anche senza login) | E |
-| 34 | C | `emergency.php:210` | `PDOException` non gestita (prefisso tabelle sbagliato) → 500 vuoto | U/E |
-| 35 | C | `emergency.php` | Mancano `X-Frame-Options`/`frame-ancestors`, `X-Robots-Tag`, `Cache-Control: no-store`; cookie `secure` non rilevato dietro proxy TLS; durata sessione PHP < 30 minuti | E |
-| 36 | C | `emergency.php` | Log accessi e file del rate limit senza rotazione; righe di log falsificabili con a capo | U/E |
-| 37 | C | `emergency.php:194` | Prima del login rivela se l'emergency è attivo, se c'è una password, se il DB risponde; mostra per intero l'error log del server | E |
-| 38 | C | `emergency.php:250` | Logout via GET senza CSRF | E |
+| 33 ✅ | C | `emergency.php:178` e altri | `csrf`/`password` inviati come array → TypeError, pagina 500 (anche senza login) | E |
+| 34 ✅ | C | `emergency.php:210` | `PDOException` non gestita (prefisso tabelle sbagliato) → 500 vuoto | U/E |
+| 35 ✅ | C | `emergency.php` | Mancano `X-Frame-Options`/`frame-ancestors`, `X-Robots-Tag`, `Cache-Control: no-store`; cookie `secure` non rilevato dietro proxy TLS; durata sessione PHP < 30 minuti | E |
+| 36 ✅ | C | `emergency.php` | Log accessi e file del rate limit senza rotazione; righe di log falsificabili con a capo | U/E |
+| 37 ✅ | C | `emergency.php:194` | Prima del login rivela se l'emergency è attivo, se c'è una password, se il DB risponde; mostra per intero l'error log del server | E |
+| 38 ✅ | C | `emergency.php:250` | Logout via GET senza CSRF | E |
 
 ### 2.3 Lato WordPress
 
@@ -107,9 +107,9 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 47 | B | `class-snapshots.php:115` | Multisite: plugin attivi in rete ignorati in cattura, diff e ripristino | I (multisite) |
 | 48 | B | `class-admin.php:303,278` | "Ripristino completato" ed "eliminato" mostrati anche in caso di errore | E |
 | 49 | B | `class-queries.php:31-64` | Il monitor salva fino a 500 query complete a ogni richiesta pubblica (login, REST, checkout, WP-CLI): email, indirizzi, token di sessione nel database e nei backup; una scrittura pesante per richiesta | I |
-| 50 | B | `db-debug-manager.php` | Manca `Update URI`: lo slug può ricevere "aggiornamenti" da un plugin omonimo su wordpress.org; `DISALLOW_FILE_MODS` non rispettato per `wp-config.php` | U |
+| 50 ✅ | B | `db-debug-manager.php` | Manca `Update URI`: lo slug può ricevere "aggiornamenti" da un plugin omonimo su wordpress.org; `DISALLOW_FILE_MODS` non rispettato per `wp-config.php` | U |
 | 51 | C | — | Nessuna disinstallazione: restano opzioni, transient, cartella privata e le costanti scritte in `wp-config.php` | I |
-| 52 | C | `class-log.php:57` | Lettura della coda del log quadratica, memoria illimitata su righe lunghissime; `tail()` restituisce N+1 righe | U |
+| 52 ✅ | C | `class-log.php:57` | Lettura della coda del log quadratica, memoria illimitata su righe lunghissime; `tail()` restituisce N+1 righe | U |
 | 53 | C | `class-admin.php:165` | Download del log: buffer non svuotati, `Content-Length` che cambia, niente `nosniff` | E |
 | 54 | C | `page.php:24-65` | Messaggi `err` dalla query string mostrati in admin (contenuto arbitrario via link) | E |
 | 55 | C | `class-emergency.php:111` | Cartella privata `0755`, file `0644` (backup con credenziali leggibile da altri utenti su hosting condiviso); token creato due volte in caso di richieste concorrenti; cartella creata da root con WP-CLI | I |
@@ -117,6 +117,11 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 57 | C | `admin.js` | Senza `debug.log` al caricamento il viewer non esiste e l'auto-refresh non fa nulla; nessun `.fail()` (nonce scaduto) | E |
 | 58 | C | template | i18n assente (`load_plugin_textdomain`, `Domain Path`); stringhe non traducibili; percorso del backup indicato in modo errato | — |
 | 59 | C | template | Accessibilità: checkbox delle costanti senza etichetta, filtri con solo placeholder, pulsante 🗑 senza nome, `#999` su bianco (2,8:1) | E (axe) |
+| 60 ✅ | B | `tab-emergency.php:23` | La regola Nginx suggerita protegge ancora `plugins/db-debug-manager/private`: dalla 1.4.0 la cartella privata è `wp-content/dbdm-private-*` (trovato nella Fase 1) | E |
+
+Fase 1: 7 in parte (stato nel pannello corretto; il percorso effettivo da
+`ini_get('error_log')` richiede costanti definite davvero: integration della
+Fase 2).
 
 Legenda (aggiornata alla Fase A, 2026-10-06): ✅ corretto con test · ½ in
 parte (33: `csrf`/`password` come array gestiti, il resto in 2.0.0; 46:
@@ -181,15 +186,36 @@ dichiarato oggi) non supporta PHPUnit 9, un motivo in più per il passaggio a
 `emergency.php` esegue sessione, I/O ed `exit` al caricamento: le sue
 funzioni non si possono testare. Prima dei test:
 
-- [ ] estrarre da `emergency.php` classi includibili senza effetti
+- [x] estrarre da `emergency.php` classi includibili senza effetti
       (`inc/emergency/`): richiesta/IP, rate limit con orologio e storage
       iniettabili e lock, sessione, CSRF, azioni sul DB, rendering; il file
       `emergency.php` resta un punto d'ingresso sottile;
-- [ ] in `DBDM_Standalone_Config`: parser di `wp-config.php` basato su
+- [x] in `DBDM_Standalone_Config` (fatto nella Fase A): parser di `wp-config.php` basato su
       `token_get_all` (commenti e condizionali esclusi, `getenv`/`getenv_docker`
       risolti), costruttore del DSN puro, writer atomico (temp + `rename`,
       lock, verifica dei byte, backup verificato prima di scrivere), lint
       con binario iniettabile e filtro per disattivarlo nei test.
+
+Ordine dei commit nel branch `fase-1-refactor`:
+
+1. [x] refactor senza cambi di comportamento: `Request` (input tipizzato,
+       IP tramite `DBDM_Emergency_Guard`), `Session` (strict, epoca,
+       logout), `Csrf`, `Repository` (opzioni e transient via PDO), `Actions`
+       (una per azione, esito *cambiato / nessun effetto / errore*), `View`,
+       `App` (router); i 23 E2E esistenti invariati e verdi;
+2. [x] unit sulle nuove classi; `Repository` e `Actions` su PDO SQLite in
+       memoria (disponibile in locale, MySQL no);
+3. [x] bug dell'emergency, uno per commit con test rosso prima: 18–21, 27,
+       28, 30, 31, 33 (resto), 34–38;
+4. [x] bug unit di costanti e log: 6, 7 (in parte), 9, 50, 52.
+
+Fatto (2026-10-06): 8 classi in `inc/emergency/` (`DBDM_Em_Request`,
+`_Session`, `_Repository`, `_Logger`, `_Status`, `_Actions`, `_View`,
+`_App`; CSRF dentro la sessione), unit da 68 a 180, bug 6, 9, 18–21, 27,
+28, 30, 31, 33–38, 50, 52 e il nuovo 60 corretti; 7 in parte.
+
+Restano alla Fase 2: 26 (multisite dell'emergency), 45–49, 51, 55, 56. Alla
+Fase 3: 43, 44, 53, 54, 57–59.
 
 Unit test (stima 150+): corpus di `wp-config.php` reali e patologici (bug
 1, 4, 5, 9, 10, 22–25, 31), writer e backup (2, 3), rate limit e finestra
@@ -275,17 +301,24 @@ Ogni flusso utente, nel browser e via HTTP diretto, su una matrice ampia.
       che li provano), poi **2.0.0** a fine piano con refactor ed E2E
       completi. Due tag in tutto.
 
+- [x] **Bug 37** (2026-10-06): prima del login un messaggio unico
+      ("Accesso d'emergenza non disponibile"), il motivo nel log degli errori
+      di PHP; dopo il login l'error log di PHP mostra solo le voci con i
+      percorsi del sito.
+
 Proposte adottate in assenza di indicazioni diverse (da confermare):
 
-- [ ] **Posizione del debug log** (bug 41): attivando `WP_DEBUG_LOG` dal
+- [x] **Posizione del debug log** (bug 41): attivando `WP_DEBUG_LOG` dal
       pannello si scrive un percorso dentro la cartella privata; un percorso
       personalizzato già impostato viene rispettato.
-- [ ] **Monitor query** (bug 49): cattura solo le richieste di un admin
-      loggato, esclusi login e REST.
+- [x] **Monitor query** (bug 49): cattura solo le richieste
+      dell'amministratore loggato che ha attivato il monitor, esclusi login,
+      REST, AJAX e WP-CLI (confermato il 2026-10-06).
 - [x] **Requisito minimo WordPress**: 6.0 come gli altri plugin DB
       (confermato il 2026-10-06; primo commit della Fase A).
-- [ ] **Refactor di `emergency.php`**: classi includibili in `inc/emergency/`,
-      l'URL resta lo stesso.
+- [x] **Refactor di `emergency.php`**: classi includibili in `inc/emergency/`,
+      l'URL resta lo stesso. I bug B/C dell'emergency si correggono nella
+      stessa Fase 1, dopo il refactor (confermato il 2026-10-06).
 
 ### Fase A — fatta (→ 1.4.0)
 

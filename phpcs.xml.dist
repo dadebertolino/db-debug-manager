@@ -49,13 +49,15 @@
         <exclude name="Generic.Functions.CallTimePassByReference"/>
     </rule>
 
-    <!-- emergency.php è una dashboard standalone: WordPress NON è caricato,
+    <!-- emergency.php e le sue classi (inc/emergency/) sono una dashboard standalone: WordPress NON è caricato,
          quindi i vincoli sui global WP e su ini_set non hanno senso lì. -->
     <rule ref="WordPress.WP.GlobalVariablesOverride">
         <exclude-pattern>emergency\.php</exclude-pattern>
+        <exclude-pattern>inc/emergency/*</exclude-pattern>
     </rule>
     <rule ref="WordPress.PHP.IniSet">
         <exclude-pattern>emergency\.php</exclude-pattern>
+        <exclude-pattern>inc/emergency/*</exclude-pattern>
     </rule>
 
     <!-- Sicurezza: sempre bloccante. -->
@@ -68,22 +70,27 @@
          La sicurezza è gestita con htmlspecialchars/CSRF token propri. -->
     <rule ref="WordPress.Security.EscapeOutput">
         <exclude-pattern>emergency\.php</exclude-pattern>
+        <exclude-pattern>inc/emergency/*</exclude-pattern>
         <exclude-pattern>inc/class-standalone-config\.php</exclude-pattern>
     </rule>
     <rule ref="WordPress.Security.NonceVerification">
         <exclude-pattern>emergency\.php</exclude-pattern>
+        <exclude-pattern>inc/emergency/*</exclude-pattern>
     </rule>
     <rule ref="WordPress.Security.ValidatedSanitizedInput">
         <exclude-pattern>emergency\.php</exclude-pattern>
+        <exclude-pattern>inc/emergency/*</exclude-pattern>
         <exclude-pattern>inc/class-standalone-config\.php</exclude-pattern>
     </rule>
     <rule ref="WordPress.WP.AlternativeFunctions">
         <exclude-pattern>emergency\.php</exclude-pattern>
+        <exclude-pattern>inc/emergency/*</exclude-pattern>
         <exclude-pattern>inc/class-standalone-config\.php</exclude-pattern>
     </rule>
     <rule ref="WordPress.DB.RestrictedClasses">
         <!-- PDO è necessario nel contesto standalone (WP non caricato). -->
         <exclude-pattern>emergency\.php</exclude-pattern>
+        <exclude-pattern>inc/emergency/*</exclude-pattern>
         <exclude-pattern>inc/class-standalone-config\.php</exclude-pattern>
     </rule>
 </ruleset>

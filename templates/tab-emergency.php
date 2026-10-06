@@ -20,7 +20,7 @@ if (!$dbdm_is_apache):
     <span>
         <strong><?php esc_html_e('Server non Apache rilevato.', 'db-debug-manager'); ?></strong>
         <?php esc_html_e('I file interni del plugin (log, snapshot, backup di wp-config) sono in una cartella con nome casuale e protetta da .htaccess, ma su Nginx l\'.htaccess viene ignorato. Per una protezione esplicita aggiungi alla configurazione del server:', 'db-debug-manager'); ?>
-        <br><code style="display:block; margin-top:6px; user-select:all;">location ~ /wp-content/plugins/db-debug-manager/(private|.*\.(log|json|dbdm-bak)$) { deny all; }</code>
+        <br><code style="display:block; margin-top:6px; user-select:all;"><?php echo esc_html(DBDM_Emergency::nginx_rule()); ?></code>
     </span>
 </div>
 <?php endif; ?>
@@ -138,6 +138,7 @@ if (!$dbdm_is_apache):
             <li><?php esc_html_e('Inserisci la password configurata.', 'db-debug-manager'); ?></li>
             <li><?php esc_html_e('Se vedi la dashboard, funziona anche quando WP è morto.', 'db-debug-manager'); ?></li>
         </ol>
+        <p style="margin:10px 0 0;"><?php esc_html_e('Se la pagina dice «Accesso d\'emergenza non disponibile», il motivo (accesso disattivato, password mancante, database, cartella privata) è scritto nel log degli errori di PHP del server: per sicurezza non viene mostrato a chi apre la pagina.', 'db-debug-manager'); ?></p>
     </div>
 </div>
 <?php endif; ?>

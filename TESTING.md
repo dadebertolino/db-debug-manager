@@ -42,8 +42,17 @@ con PDO. Un difetto può fermare un sito o aprire un accesso:
 ## Unit
 
 `tests/unit/bootstrap.php` definisce gli stub WordPress e carica tutte le
-classi di `inc/` (solo definizioni). `emergency.php` e `db-debug-manager.php`
-non si caricano: eseguono codice al caricamento.
+classi di `inc/` e `inc/emergency/` (solo definizioni). `emergency.php` e
+`db-debug-manager.php` non si caricano: eseguono codice al caricamento.
+
+L'accesso d'emergenza è diviso in classi senza effetti al caricamento
+(`inc/emergency/`): richiesta, sessione e CSRF su un array qualsiasi,
+repository delle opzioni via PDO, log, stato, azioni, pagine, flusso.
+`EmergencyActionsTest` prova repository e azioni su **PDO SQLite in
+memoria** (estensione `pdo_sqlite`, dichiarata nel job unit), con plugin,
+temi, `wp-config.php` e cartella privata in una cartella temporanea.
+`DBDM_Em_App::dispatch()` accetta una connessione iniettata: i casi d'errore
+del flusso (database, accesso non disponibile) si provano senza sessione PHP.
 
 | Helper | A cosa serve |
 |--------|--------------|

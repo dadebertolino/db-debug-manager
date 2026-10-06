@@ -159,6 +159,28 @@ db-debug-manager/
 
 ## Changelog
 
+### Non rilasciata
+
+- **Fix: lettura del debug.log lenta e senza limite di memoria** su file grandi o con righe lunghissime, e con una riga in più del richiesto. Ora è lineare, legge al massimo 2 MB e segna con … una riga tagliata.
+- **`Update URI` nell'intestazione del plugin:** WordPress non può più proporre come aggiornamento un plugin omonimo di wordpress.org.
+- **Rispetto di `DISALLOW_FILE_MODS`:** con le modifiche ai file disattivate, né il pannello né l'emergency scrivono `wp-config.php`; il pannello lo spiega.
+- **Fix: `define( 'WP_DEBUG', 1 )` appariva spenta nel pannello** e salvando un'altra costante veniva riscritta `false`. Ora ogni costante è attiva se il suo valore è vero per PHP; `WP_DEBUG_LOG` con `'1'` o `'true'` non è più mostrata come "file custom".
+- **Fix: la regola Nginx suggerita nella tab Emergency proteggeva la vecchia cartella** dentro il plugin. Ora indica `wp-content/dbdm-private-*` (anche con `wp-content` spostata). Chi aveva copiato la regola precedente dovrebbe sostituirla (nel frattempo i file restano protetti dal nome casuale della cartella).
+- **Sicurezza (emergency): nessuna informazione prima del login.** Se l'accesso non è disponibile la pagina lo dice e basta; il motivo (disattivato, senza password, database, cartella privata) va nel log degli errori di PHP. Dopo il login l'error log di PHP mostra solo le voci di questo sito, non quelle di altri siti sullo stesso server.
+- **Emergency: avviso con object cache persistente** (Redis, Memcached): le modifiche ai plugin attivi e al tema possono non avere effetto finché la cache non viene svuotata.
+- **Fix (emergency): log degli accessi senza limite e falsificabile.** Ora ruota a 1 MB (una copia precedente) e gli a capo inviati dal client (User-Agent, campi dei moduli) non possono più creare righe false.
+- **Sicurezza (emergency): header contro framing, indicizzazione e cache** (`X-Frame-Options`, `frame-ancestors`, `X-Robots-Tag`, `Cache-Control: no-store`, `Referrer-Policy`, `nosniff`). Il cookie di sessione è `secure` anche dietro un proxy che termina HTTPS.
+- **Fix (emergency): logout tramite un semplice link.** Una pagina esterna poteva chiudere la sessione d'emergenza; ora il logout è un modulo con token.
+- **Fix (emergency): pagina bianca (errore 500) se il database risponde ma le tabelle non corrispondono** a `$table_prefix`. Ora una pagina spiega cosa controllare; il dettaglio tecnico va nel log degli errori di PHP.
+- **Fix (emergency): stato delle costanti di debug sbagliato** con `define( 'WP_DEBUG', 1 )`, valori da `getenv()`, `define` condizionali o copie commentate. Ora è letto come lo vede PHP; un valore non determinabile è indicato come "da verificare".
+- **Fix (emergency): azioni riportate come riuscite anche senza effetto.** Un plugin già disattivato, nessun transient, un log già vuoto ora danno un avviso giallo; un elenco dei plugin illeggibile, un'azione sconosciuta o un modulo scaduto (prima ignorato in silenzio) danno un errore. "Disattiva" funziona anche con nomi di plugin non UTF-8.
+- **Fix (emergency): "Cambia a tema default" poteva scegliere il tema rotto stesso o un child theme.** Ora esclude il tema attivo e il suo padre e sceglie solo temi completi.
+- **Fix (emergency): con `WP_CONTENT_DIR` o la cartella dei plugin spostati**, l'emergency cercava temi, plugin e `debug.log` nelle posizioni standard (cambio di tema e ripristino degli snapshot fallivano). Ora usa i percorsi che WordPress salva insieme alla cartella privata.
+- **Fix (emergency): spegnendo `WP_DEBUG_LOG` il percorso personalizzato del log andava perso.** Ora viene ricordato come fa il pannello, e alla riaccensione il log torna lì; un percorso ricordato che porterebbe al log pubblico è ignorato.
+- **Fix (emergency): debug.log e error log di PHP apparivano vuoti** se contenevano un byte non UTF-8 (testo Latin-1, coda tagliata a metà carattere). Ora i caratteri non validi sono mostrati come �.
+- **Fix (emergency): uno slug di plugin con un apostrofo rompeva la conferma di "Disattiva"** e poteva eseguire codice JavaScript nella dashboard. Il testo della conferma è ora codificato per JavaScript prima che per HTML.
+- **Interno: `emergency.php` diviso in classi** (`inc/emergency/`: richiesta, sessione e CSRF, accesso al database, log degli accessi, azioni, stato del sito, pagine, flusso). L'URL e il comportamento non cambiano; le parti si possono ora provare con test automatici.
+
 ### 1.4.0 — Sicurezza dell'emergency e di wp-config.php — 2026-10-06
 
 Prima release del piano di test (`TESTING-PLAN.md`): corregge tutti i difetti di priorità A trovati dall'audit, ciascuno con un test automatico.
