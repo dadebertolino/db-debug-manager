@@ -187,6 +187,37 @@ class EmergencyCoreTest extends TestCase {
 		$this->assertStringEndsWith( '| clear_transients: 3', $lines[1] );
 	}
 
+	/**
+	 * Bug 36: un a capo nello User-Agent o nel dettaglio (uno slug inviato
+	 * con il modulo) creava righe false nel log.
+	 */
+	public function test_righe_del_log_non_falsificabili(): void {
+		$file   = $this->dir . '/emergency-access.log';
+		$logger = new DBDM_Em_Logger( $file, '203.0.113.5', "Mozilla\n[2026-01-01 00:00:00] LOGIN_SUCCESS | IP=1.2.3.4" );
+		$logger->log( 'ACTION', "disable_plugin: x\r\n[2026-01-01] LOGIN_SUCCESS\t\x00", 0 );
+
+		$lines = file( $file, FILE_IGNORE_NEW_LINES );
+		$this->assertCount( 1, $lines );
+		$this->assertStringContainsString( 'UA=Mozilla\n[2026-01-01 00:00:00] LOGIN_SUCCESS', $lines[0] );
+		$this->assertStringEndsWith( '| disable_plugin: x\r\n[2026-01-01] LOGIN_SUCCESS\t\x00', $lines[0] );
+	}
+
+	/**
+	 * Bug 36: il log degli accessi cresceva senza limite.
+	 */
+	public function test_rotazione_del_log_degli_accessi(): void {
+		$file   = $this->dir . '/emergency-access.log';
+		$logger = new DBDM_Em_Logger( $file, '203.0.113.5', 'ua', 200 );
+		for ( $i = 0; $i < 6; $i++ ) {
+			$logger->log( 'LOGIN_FAIL', 'tentativo ' . $i, 0 );
+		}
+
+		$this->assertLessThanOrEqual( 200 + 100, filesize( $file ) );
+		$this->assertFileExists( $file . '.1', 'una sola copia precedente' );
+		$this->assertFileDoesNotExist( $file . '.2' );
+		$this->assertStringEndsWith( "tentativo 5\n", file_get_contents( $file ), 'l\'ultima riga è nel file corrente' );
+	}
+
 	/* --- Stato del sito ------------------------------------------------------ */
 
 	public function test_percorso_del_debug_log(): void {

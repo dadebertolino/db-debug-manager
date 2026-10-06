@@ -231,6 +231,7 @@ class DBDM_Emergency {
 
     public static function clear_log() {
         @unlink(self::log_path());
+        @unlink(self::log_path() . '.1'); // Copia ruotata da emergency.php (2.0.0).
         @unlink(self::rate_limit_path());
     }
 

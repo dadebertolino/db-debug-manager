@@ -61,6 +61,17 @@ class PrivateDirAndSettingsTest extends TestCase {
 		);
 	}
 
+	public function test_svuota_log_degli_accessi_anche_la_copia_ruotata(): void {
+		$log = DBDM_Emergency::log_path();
+		file_put_contents( $log, "riga\n" );
+		file_put_contents( $log . '.1', "vecchia\n" );
+
+		DBDM_Emergency::clear_log();
+
+		$this->assertFileDoesNotExist( $log );
+		$this->assertFileDoesNotExist( $log . '.1' );
+	}
+
 	public function test_migrazione_dalla_cartella_del_plugin(): void {
 		$token = 'abcdef0123456789';
 		update_option( DBDM_Emergency::OPTION_DIR_TOKEN, $token );
