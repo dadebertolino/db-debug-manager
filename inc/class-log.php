@@ -71,35 +71,62 @@ class DBDM_Log {
      * Legge le ultime N righe del log in modo efficiente.
      */
     public static function tail($lines = 500) {
-        $path = self::get_path();
         if (!self::exists()) {
             return '';
         }
+        return self::tail_file(self::get_path(), max(10, min(10000, (int) $lines)));
+    }
 
-        $lines = max(10, min(10000, (int) $lines));
-        $fp = @fopen($path, 'rb');
+    /** Byte letti al massimo dalla fine del file. */
+    const TAIL_MAX_BYTES = 2097152;
+
+    /**
+     * Ultime $lines righe di un file, senza l'a capo finale.
+     *
+     * 2.0.0 (bug 52): lettura all'indietro a blocchi, tempo lineare (prima
+     * ogni blocco ricopiava e ricontava tutto il letto), al massimo
+     * $max_bytes in memoria anche con righe lunghissime, esattamente
+     * $lines righe (prima una in più senza a capo finale).
+     *
+     * @param string $path
+     * @param int    $lines
+     * @param int    $max_bytes
+     * @return string
+     */
+    public static function tail_file($path, $lines, $max_bytes = self::TAIL_MAX_BYTES) {
+        $size = is_file($path) ? (int) filesize($path) : 0;
+        $fp   = $size > 0 ? @fopen($path, 'rb') : false;
         if (!$fp) {
             return '';
         }
 
-        $buffer  = '';
-        $chunk   = 8192;
-        $size    = filesize($path);
-        $pos     = $size;
-        $read    = '';
-        $count   = 0;
-
-        while ($pos > 0 && $count <= $lines) {
-            $seek = min($chunk, $pos);
-            $pos -= $seek;
+        $chunks   = array();
+        $newlines = 0;
+        $pos      = $size;
+        $read     = 0;
+        // Una riga in più di a capo: l'eventuale a capo finale non chiude
+        // una riga da mostrare.
+        while ($pos > 0 && $newlines <= $lines && $read < $max_bytes) {
+            $len   = (int) min(8192, $pos, $max_bytes - $read);
+            $pos  -= $len;
             fseek($fp, $pos);
-            $read    = fread($fp, $seek) . $read;
-            $count   = substr_count($read, "\n");
+            $chunk = (string) fread($fp, $len);
+            $chunks[]  = $chunk;
+            $newlines += substr_count($chunk, "\n");
+            $read     += strlen($chunk);
         }
         fclose($fp);
 
-        $all = explode("\n", $read);
-        $all = array_slice($all, -$lines - 1);
+        $data = implode('', array_reverse($chunks));
+        if (substr($data, -1) === "\n") {
+            $data = substr($data, 0, -1);
+        }
+        $all = explode("\n", $data);
+        $all = array_slice($all, -$lines);
+        // Letto fino al limite di byte prima di N righe: la prima è tagliata.
+        if ($pos > 0 && $newlines <= $lines) {
+            $all[0] = '…' . $all[0];
+        }
         return implode("\n", $all);
     }
 

@@ -109,7 +109,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 49 | B | `class-queries.php:31-64` | Il monitor salva fino a 500 query complete a ogni richiesta pubblica (login, REST, checkout, WP-CLI): email, indirizzi, token di sessione nel database e nei backup; una scrittura pesante per richiesta | I |
 | 50 ✅ | B | `db-debug-manager.php` | Manca `Update URI`: lo slug può ricevere "aggiornamenti" da un plugin omonimo su wordpress.org; `DISALLOW_FILE_MODS` non rispettato per `wp-config.php` | U |
 | 51 | C | — | Nessuna disinstallazione: restano opzioni, transient, cartella privata e le costanti scritte in `wp-config.php` | I |
-| 52 | C | `class-log.php:57` | Lettura della coda del log quadratica, memoria illimitata su righe lunghissime; `tail()` restituisce N+1 righe | U |
+| 52 ✅ | C | `class-log.php:57` | Lettura della coda del log quadratica, memoria illimitata su righe lunghissime; `tail()` restituisce N+1 righe | U |
 | 53 | C | `class-admin.php:165` | Download del log: buffer non svuotati, `Content-Length` che cambia, niente `nosniff` | E |
 | 54 | C | `page.php:24-65` | Messaggi `err` dalla query string mostrati in admin (contenuto arbitrario via link) | E |
 | 55 | C | `class-emergency.php:111` | Cartella privata `0755`, file `0644` (backup con credenziali leggibile da altri utenti su hosting condiviso); token creato due volte in caso di richieste concorrenti; cartella creata da root con WP-CLI | I |

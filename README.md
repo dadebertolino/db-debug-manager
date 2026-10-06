@@ -161,6 +161,7 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Fix: lettura del debug.log lenta e senza limite di memoria** su file grandi o con righe lunghissime, e con una riga in più del richiesto. Ora è lineare, legge al massimo 2 MB e segna con … una riga tagliata.
 - **`Update URI` nell'intestazione del plugin:** WordPress non può più proporre come aggiornamento un plugin omonimo di wordpress.org.
 - **Rispetto di `DISALLOW_FILE_MODS`:** con le modifiche ai file disattivate, né il pannello né l'emergency scrivono `wp-config.php`; il pannello lo spiega.
 - **Fix: `define( 'WP_DEBUG', 1 )` appariva spenta nel pannello** e salvando un'altra costante veniva riscritta `false`. Ora ogni costante è attiva se il suo valore è vero per PHP; `WP_DEBUG_LOG` con `'1'` o `'true'` non è più mostrata come "file custom".

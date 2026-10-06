@@ -98,4 +98,49 @@ class ConfigAndLogTest extends TestCase {
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'dbdm_file_mods_disallowed', $result->get_error_code() );
 	}
+
+	/* --- Bug 52: coda del log ----------------------------------------------- */
+
+	private function lines( $from, $to, $eol = "\n" ) {
+		$out = array();
+		for ( $i = $from; $i <= $to; $i++ ) {
+			$out[] = 'riga ' . $i;
+		}
+		return implode( $eol, $out );
+	}
+
+	public function test_tail_restituisce_esattamente_n_righe(): void {
+		$log = DBDM_Log::public_path();
+		file_put_contents( $log, $this->lines( 1, 30 ) );
+		$this->assertSame( $this->lines( 21, 30 ), DBDM_Log::tail( 10 ), 'senza a capo finale' );
+
+		file_put_contents( $log, $this->lines( 1, 30 ) . "\n" );
+		$this->assertSame( $this->lines( 21, 30 ), DBDM_Log::tail( 10 ), 'con a capo finale' );
+		unlink( $log );
+	}
+
+	public function test_tail_su_piu_blocchi_e_file_corti(): void {
+		$file = WP_CONTENT_DIR . '/coda.log';
+		file_put_contents( $file, $this->lines( 1, 5000 ) . "\n" );
+		$this->assertSame( $this->lines( 4901, 5000 ), DBDM_Log::tail_file( $file, 100 ) );
+		$this->assertSame( $this->lines( 1, 5000 ), DBDM_Log::tail_file( $file, 10000 ) );
+
+		file_put_contents( $file, '' );
+		$this->assertSame( '', DBDM_Log::tail_file( $file, 10 ) );
+		$this->assertSame( '', DBDM_Log::tail_file( $file . '.assente', 10 ) );
+		unlink( $file );
+	}
+
+	public function test_tail_con_riga_enorme_entro_il_limite_di_memoria(): void {
+		$file = WP_CONTENT_DIR . '/enorme.log';
+		file_put_contents( $file, "prima\n" . str_repeat( 'x', 3 * 1048576 ) . "\nultima\n" );
+
+		$tail = DBDM_Log::tail_file( $file, 10, 1048576 );
+
+		$this->assertLessThanOrEqual( 1048576 + strlen( '…' ), strlen( $tail ) );
+		$this->assertStringStartsWith( '…xxx', $tail, 'riga tagliata segnalata' );
+		$this->assertStringEndsWith( "x\nultima", $tail );
+		$this->assertStringNotContainsString( 'prima', $tail );
+		unlink( $file );
+	}
 }
