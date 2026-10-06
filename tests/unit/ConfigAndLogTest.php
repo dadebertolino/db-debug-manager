@@ -1,6 +1,7 @@
 <?php
 /**
- * Lato WordPress di costanti e log: stato mostrato nel pannello (bug 6, 7).
+ * Costanti e log: stato mostrato nel pannello (bug 6, 7), dettagli della
+ * scrittura di wp-config.php (bug 9).
  *
  * @package DBDM\Tests
  */
@@ -45,5 +46,36 @@ class ConfigAndLogTest extends TestCase {
 			'log percorso'            => array( 'WP_DEBUG_LOG', true, '/srv/log/wp.log', true, '/srv/log/wp.log' ),
 			'percorso su altra costante' => array( 'WP_DEBUG', true, '/srv/x', true, '' ),
 		);
+	}
+
+	/* --- Bug 9: dettagli della scrittura ------------------------------------ */
+
+	public function test_crlf_conservato_in_modifica_e_inserimento(): void {
+		$crlf = "<?php\r\ndefine( 'DB_NAME', 'wp' );\r\ndefine( 'WP_DEBUG', false );\r\n\$table_prefix = 'wp_';\r\n/* That's all, stop editing! Happy publishing. */\r\nrequire_once ABSPATH . 'wp-settings.php';\r\n";
+
+		$out = DBDM_Standalone_Config::replace_or_insert_constant( $crlf, 'WP_DEBUG', 'true' );
+		$out = DBDM_Standalone_Config::replace_or_insert_constant( $out, 'SCRIPT_DEBUG', 'true' );
+
+		$this->assertSame( 0, preg_match( "/(?<!\r)\n/", $out ), 'nessun a capo senza \\r' );
+		$this->assertStringContainsString( "define( 'WP_DEBUG', true );\r\n", $out );
+		$this->assertStringContainsString( "define( 'SCRIPT_DEBUG', true );\r\n", $out );
+		$this->assertTrue( DBDM_Standalone_Config::php_lint_string( $out ) );
+	}
+
+	public function test_nome_della_costante_sensibile_alle_maiuscole(): void {
+		$src = "<?php\ndefine( 'wp_debug', false );\n/* That's all, stop editing! */\nrequire_once ABSPATH . 'wp-settings.php';\n";
+		$out = DBDM_Standalone_Config::replace_or_insert_constant( $src, 'WP_DEBUG', 'true' );
+
+		$this->assertStringContainsString( "define( 'wp_debug', false );", $out, 'un\'altra costante: non toccata' );
+		$this->assertTrue( DBDM_Standalone_Config::effective_defines( $out )['WP_DEBUG'] );
+	}
+
+	public function test_percorso_con_apici_e_backslash_scritto_letteralmente(): void {
+		$path   = "C:\\logs\\l'app\\debug.log";
+		$source = dbdm_test_call_private( 'DBDM_Config', 'format_value', array( $path ) );
+		$out    = DBDM_Standalone_Config::replace_or_insert_constant( "<?php\n", 'WP_DEBUG_LOG', $source );
+
+		$this->assertTrue( DBDM_Standalone_Config::php_lint_string( $out ) );
+		$this->assertSame( $path, DBDM_Standalone_Config::effective_defines( $out )['WP_DEBUG_LOG'] );
 	}
 }

@@ -56,7 +56,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 6 ✅ | B | `tab-config.php:64` | `define('WP_DEBUG', 1)` mostrato come spento; salvando un'altra costante si scrive `false` | U/I |
 | 7 ½ | B | `class-log.php:16`, `tab-config.php:64` | `WP_DEBUG_LOG` `'true'`/`'1'` trattato come percorso di file (il core lo intende come `wp-content/debug.log`); `ini error_log` ignorato | U |
 | 8 ✅ | B | `class-admin.php:98` | Ogni salvataggio scrive tutte e 5 le costanti; su un sito pulito `WP_DEBUG_DISPLAY` risulta già spuntato (default del core) e finisce scritto `true`: errori visibili ai visitatori | E |
-| 9 | C | `class-standalone-config.php`, `class-config.php:142` | CRLF convertiti in LF sulla riga modificata; nome costante case-insensitive; `addslashes` in una stringa a virgolette singole | U |
+| 9 ✅ | C | `class-standalone-config.php`, `class-config.php:142` | CRLF convertiti in LF sulla riga modificata; nome costante case-insensitive; `addslashes` in una stringa a virgolette singole | U |
 
 ### 2.2 Accesso d'emergenza (`emergency.php`)
 
