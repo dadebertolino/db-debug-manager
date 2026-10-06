@@ -39,7 +39,7 @@ Plugin WordPress per gestire il debug direttamente dal pannello di amministrazio
 
 ## Requisiti
 
-- WordPress 5.8+
+- WordPress 6.0+
 - PHP 7.4+
 - `wp-config.php` scrivibile (permessi 0644 consigliati)
 - Per l'emergency access: estensione `pdo_mysql` attiva
@@ -157,6 +157,8 @@ db-debug-manager/
 ## Changelog
 
 ### Non rilasciata
+- **Requisito minimo WordPress 6.0** (era 5.8), allineato agli altri plugin DB. WordPress stesso impedisce l'attivazione sulle versioni precedenti.
+- **Suite di test:** unit (PHP 7.4–8.4), integration (WordPress 6.0 e ultima versione, anche multisite) ed E2E (wp-env + Playwright, compreso l'accesso a `emergency.php`), più una run notturna su WordPress in sviluppo e PHP 8.4. Vedi `TESTING.md`.
 - **Aggiornamenti dal pannello:** `DB_GitHub_Updater` 1.1.0, lo stesso di DB Privacy Hub 1.8.0. Dopo un aggiornamento il plugin viene riattivato solo se era attivo (prima veniva attivato anche se l'admin l'aveva disattivato), anche per l'attivazione di rete; release senza ZIP ignorate invece di generare un errore; nessun errore se il filesystem di WordPress non è disponibile.
 
 ### 1.3.2 — 2026-07-17

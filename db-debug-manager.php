@@ -8,7 +8,7 @@
  * Author URI: https://www.davidebertolino.it
  * License: GPL v2 or later
  * Text Domain: db-debug-manager
- * Requires at least: 5.8
+ * Requires at least: 6.0
  * Requires PHP: 7.4
  */
 

@@ -16,7 +16,7 @@
     <!-- Gli error bloccano la CI; i warning informano soltanto. -->
     <config name="ignore_warnings_on_exit" value="1"/>
 
-    <config name="minimum_wp_version" value="5.8"/>
+    <config name="minimum_wp_version" value="6.0"/>
 
     <rule ref="WordPress-Extra">
         <!-- Stile del progetto: 4 spazi, niente allineamenti WP, niente Yoda. -->

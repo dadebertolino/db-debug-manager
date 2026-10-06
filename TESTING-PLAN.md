@@ -22,7 +22,7 @@ verificati sul codice).
 - **Nessun test nel repository.** CI: `php -l` su 7.4 e 8.3, PHPCS (WPCS);
   release da tag `v*`.
 - Updater: 1.1.0 in arrivo con la PR #1 (stesso file di DB Privacy Hub 1.8.0).
-- Requisito dichiarato: WordPress 5.8, PHP 7.4.
+- Requisito dichiarato: WordPress 5.8, PHP 7.4 (6.0 dalla Fase A, §7).
 
 Aree e rischio:
 
@@ -275,7 +275,8 @@ Proposte adottate in assenza di indicazioni diverse (da confermare):
       personalizzato già impostato viene rispettato.
 - [ ] **Monitor query** (bug 49): cattura solo le richieste di un admin
       loggato, esclusi login e REST.
-- [ ] **Requisito minimo WordPress**: 6.0 come gli altri plugin DB.
+- [x] **Requisito minimo WordPress**: 6.0 come gli altri plugin DB
+      (confermato il 2026-10-06; primo commit della Fase A).
 - [ ] **Refactor di `emergency.php`**: classi includibili in `inc/emergency/`,
       l'URL resta lo stesso.
 
