@@ -61,3 +61,6 @@ final class DB_Debug_Manager {
 }
 
 DB_Debug_Manager::instance();
+
+// 1.4.0: disattivando il plugin l'accesso emergency si spegne.
+register_deactivation_hook(__FILE__, array('DBDM_Emergency', 'on_plugin_deactivate'));

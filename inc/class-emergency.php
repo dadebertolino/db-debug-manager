@@ -11,6 +11,13 @@ class DBDM_Emergency {
     const OPTION_HASH        = 'dbdm_emergency_hash';
     const OPTION_ENABLED     = 'dbdm_emergency_enabled';
     const OPTION_TRUST_PROXY = 'dbdm_emergency_trust_proxy';
+    /**
+     * Epoca delle sessioni emergency (1.4.0): emergency.php lega ogni
+     * sessione a questo valore; cambiarlo invalida tutte le sessioni aperte.
+     * Cambia a ogni modifica di password o abilitazione e alla
+     * disattivazione del plugin.
+     */
+    const OPTION_EPOCH       = 'dbdm_emergency_epoch';
     const MIN_PWD_LEN        = 12;
 
     public static function is_enabled() {
@@ -18,7 +25,29 @@ class DBDM_Emergency {
     }
 
     public static function set_enabled($enabled) {
+        if ((bool) $enabled !== self::is_enabled()) {
+            self::bump_epoch();
+        }
         update_option(self::OPTION_ENABLED, (bool) $enabled, false);
+    }
+
+    /**
+     * Invalida tutte le sessioni emergency aperte.
+     *
+     * @since 1.4.0
+     */
+    public static function bump_epoch() {
+        update_option(self::OPTION_EPOCH, bin2hex(random_bytes(16)), false);
+    }
+
+    /**
+     * Disattivazione del plugin (1.4.0): l'accesso emergency si spegne e le
+     * sessioni aperte vengono chiuse. Deve restare usabile a sito rotto, ma
+     * non dopo che l'admin ha scelto di disattivare il plugin.
+     */
+    public static function on_plugin_deactivate() {
+        self::set_enabled(false);
+        self::bump_epoch();
     }
 
     /**
@@ -54,12 +83,14 @@ class DBDM_Emergency {
         }
         $hash = password_hash($plain, PASSWORD_DEFAULT);
         update_option(self::OPTION_HASH, $hash, false); // autoload false
+        self::bump_epoch();
         return true;
     }
 
     public static function clear_password() {
         delete_option(self::OPTION_HASH);
         self::set_enabled(false);
+        self::bump_epoch();
     }
 
     /**
@@ -74,15 +105,19 @@ class DBDM_Emergency {
     }
 
     const OPTION_DIR_TOKEN   = 'dbdm_private_dir_token';
+    /** Percorso assoluto della cartella privata, letto da emergency.php (1.4.0). */
+    const OPTION_DIR_PATH    = 'dbdm_private_dir_path';
 
     /**
      * Path della cartella privata (con trailing slash), garantendone
      * esistenza e protezione. Riusabile dalle altre classi del plugin.
      *
-     * Il nome contiene un token casuale (private-{16 hex}) così i file
-     * interni (log, snapshot, backup wp-config) non sono raggiungibili
-     * indovinando l'URL nemmeno su server dove .htaccess è ignorato (Nginx).
-     * Il token è salvato in wp_options ed è letto anche da emergency.php.
+     * 1.4.0: sta in wp-content/dbdm-private-{token}/, FUORI dalla cartella
+     * del plugin: fino alla 1.3.x ogni aggiornamento (o cancellazione) del
+     * plugin la eliminava, con snapshot, backup di wp-config.php e log degli
+     * accessi emergency. Il nome contiene un token casuale così i file non
+     * sono raggiungibili indovinando l'URL nemmeno dove .htaccess è ignorato
+     * (Nginx). Token e percorso sono in wp_options, letti da emergency.php.
      */
     public static function private_dir() {
         $token = get_option(self::OPTION_DIR_TOKEN, '');
@@ -91,16 +126,46 @@ class DBDM_Emergency {
             update_option(self::OPTION_DIR_TOKEN, $token, false);
         }
 
-        $dir    = DBDM_PLUGIN_DIR . 'private-' . $token;
-        $legacy = DBDM_PLUGIN_DIR . 'private';
-
-        // Migrazione: rinomina la vecchia private/ preservando i contenuti.
-        if (!is_dir($dir) && is_dir($legacy)) {
-            @rename($legacy, $dir);
+        $dir = WP_CONTENT_DIR . '/dbdm-private-' . $token;
+        if (!is_dir($dir)) {
+            self::migrate_private_dir($dir, $token);
         }
-
         self::ensure_private_dir($dir);
+
+        if (get_option(self::OPTION_DIR_PATH) !== $dir) {
+            update_option(self::OPTION_DIR_PATH, $dir, false);
+        }
         return $dir . '/';
+    }
+
+    /**
+     * Sposta i file dalle posizioni delle versioni precedenti, dentro la
+     * cartella del plugin: private-{token}/ (1.3.x) e private/ (≤ 1.2.x).
+     */
+    private static function migrate_private_dir($dir, $token) {
+        foreach (array(DBDM_PLUGIN_DIR . 'private-' . $token, DBDM_PLUGIN_DIR . 'private') as $old) {
+            if (!is_dir($old)) continue;
+            if (@rename($old, $dir)) return;
+            // Rename tra filesystem diversi: copia e cancella.
+            if (!is_dir($dir)) @mkdir($dir, 0750);
+            foreach ((array) scandir($old) as $f) {
+                if ($f === '.' || $f === '..' || !is_file($old . '/' . $f)) continue;
+                if (!file_exists($dir . '/' . $f)) @copy($old . '/' . $f, $dir . '/' . $f);
+                @unlink($old . '/' . $f);
+            }
+            @rmdir($old);
+            return;
+        }
+    }
+
+    /**
+     * True se la cartella privata esiste ed è scrivibile: senza, niente
+     * backup di wp-config.php, snapshot né rate limit dell'emergency.
+     *
+     * @since 1.4.0
+     */
+    public static function private_dir_writable() {
+        return is_writable(self::private_dir());
     }
 
     /**
@@ -108,14 +173,25 @@ class DBDM_Emergency {
      */
     private static function ensure_private_dir($dir) {
         if (!is_dir($dir)) {
-            @mkdir($dir, 0755);
+            @mkdir($dir, 0750);
         }
         if (!file_exists($dir . '/.htaccess')) {
-            @file_put_contents($dir . '/.htaccess', "Require all denied\nDeny from all\n");
+            @file_put_contents($dir . '/.htaccess', self::htaccess_rules());
         }
         if (!file_exists($dir . '/index.php')) {
             @file_put_contents($dir . '/index.php', "<?php // Silence is golden.\n");
         }
+    }
+
+    /**
+     * Regole di blocco valide sia per Apache 2.4 sia per 2.2 (una sola delle
+     * due direttive senza IfModule dà errore 500 sull'altra versione).
+     *
+     * @since 1.4.0
+     */
+    public static function htaccess_rules() {
+        return "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n"
+            . "<IfModule !mod_authz_core.c>\n    Order deny,allow\n    Deny from all\n</IfModule>\n";
     }
 
     /**

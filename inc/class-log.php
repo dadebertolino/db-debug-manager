@@ -13,10 +13,45 @@ class DBDM_Log {
      * Rispetta WP_DEBUG_LOG se è un path esplicito, altrimenti default a wp-content/debug.log.
      */
     public static function get_path() {
-        if (defined('WP_DEBUG_LOG') && is_string(WP_DEBUG_LOG) && WP_DEBUG_LOG !== '') {
-            return WP_DEBUG_LOG;
+        return self::resolve_path(defined('WP_DEBUG_LOG') ? WP_DEBUG_LOG : null);
+    }
+
+    /**
+     * Percorso del log per un valore di WP_DEBUG_LOG, come lo interpreta
+     * wp_debug_mode(): true, '1', 'true' (e qualunque valore non stringa)
+     * indicano wp-content/debug.log, le altre stringhe un percorso.
+     *
+     * @since 1.4.0
+     */
+    public static function resolve_path($value) {
+        if (is_string($value) && $value !== '' && !in_array(strtolower($value), array('1', 'true'), true)) {
+            return $value;
         }
+        return self::public_path();
+    }
+
+    /**
+     * Posizione predefinita di WordPress: dentro wp-content, raggiungibile
+     * da chiunque via HTTP.
+     *
+     * @since 1.4.0
+     */
+    public static function public_path() {
         return WP_CONTENT_DIR . '/debug.log';
+    }
+
+    /**
+     * Posizione usata dal plugin (1.4.0): nella cartella privata.
+     */
+    public static function private_path() {
+        return DBDM_Emergency::private_dir() . 'debug.log';
+    }
+
+    /**
+     * True se il log attivo è quello pubblico di wp-content.
+     */
+    public static function is_public() {
+        return defined('WP_DEBUG_LOG') && WP_DEBUG_LOG && wp_normalize_path(self::get_path()) === wp_normalize_path(self::public_path());
     }
 
     public static function exists() {

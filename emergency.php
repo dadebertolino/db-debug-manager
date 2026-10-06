@@ -26,6 +26,13 @@ ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
 // Session con scope ristretto al path del plugin.
+// 1.4.0: modalità stretta (PHP rifiuta ID di sessione scelti dal client),
+// solo cookie, durata lato server non inferiore a quella dichiarata.
+ini_set('session.use_strict_mode', '1');
+ini_set('session.use_only_cookies', '1');
+if ((int) ini_get('session.gc_maxlifetime') < 1800) {
+    ini_set('session.gc_maxlifetime', '1800');
+}
 session_name('dbdm_emergency');
 session_set_cookie_params(array(
     'lifetime' => 1800,
@@ -37,18 +44,19 @@ session_set_cookie_params(array(
 session_start();
 
 // ========= COSTANTI =========
-define('DBDM_EMERGENCY_MAX_ATTEMPTS', 5);
-define('DBDM_EMERGENCY_LOCKOUT_SEC', 900);   // 15 min
 define('DBDM_EMERGENCY_SESSION_TTL', 1800);  // 30 min
 define('DBDM_EMERGENCY_PLUGIN_DIR', __DIR__ . '/');
+// wp-content: due livelli sopra la cartella del plugin.
+define('DBDM_EMERGENCY_CONTENT_DIR', dirname(dirname(__DIR__)));
 
 require_once __DIR__ . '/inc/class-standalone-config.php';
+require_once __DIR__ . '/inc/class-emergency-guard.php';
 
 // ========= CARTELLA PRIVATA =========
-// Il nome reale (private-{token}) viene risolto dopo la connessione al DB,
-// leggendo il token da wp_options (vedi VERIFICA ATTIVAZIONE). Fallback alla
-// legacy private/ per installazioni non ancora migrate dal lato WP.
-$GLOBALS['dbdm_em_private_dir'] = __DIR__ . '/private/';
+// Risolta dopo la connessione al DB, dal percorso e dal token salvati in
+// wp_options (vedi VERIFICA ATTIVAZIONE). 1.4.0: nessun ripiego su una
+// cartella dal nome prevedibile: senza cartella privata l'accesso è negato.
+$GLOBALS['dbdm_em_private_dir'] = '';
 
 function dbdm_em_private_dir() {
     return $GLOBALS['dbdm_em_private_dir'];
@@ -58,52 +66,34 @@ function dbdm_em_private_path($file) {
     return dbdm_em_private_dir() . $file;
 }
 
-function dbdm_em_ensure_private_dir($dir) {
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755);
+/**
+ * Cartella privata creata dal pannello: dal percorso salvato, o dal token
+ * nella posizione standard (wp-content/dbdm-private-{token}/). Il nome deve
+ * avere la forma attesa: un valore manomesso nel DB non può indicare
+ * un'altra cartella.
+ *
+ * @return string Percorso con slash finale, '' se non trovata.
+ */
+function dbdm_em_resolve_private_dir($path, $token) {
+    $candidates = array();
+    if (is_string($path) && $path !== '') $candidates[] = rtrim($path, '/');
+    if (is_string($token) && preg_match('/^[a-f0-9]{16}$/', $token)) {
+        $candidates[] = DBDM_EMERGENCY_CONTENT_DIR . '/dbdm-private-' . $token;
     }
-    if (!file_exists($dir . '.htaccess')) {
-        @file_put_contents($dir . '.htaccess', "Require all denied\nDeny from all\n");
+    foreach ($candidates as $dir) {
+        if (preg_match('/^dbdm-private-[a-f0-9]{16}$/', basename($dir)) && is_dir($dir)) {
+            return $dir . '/';
+        }
     }
-    if (!file_exists($dir . 'index.php')) {
-        @file_put_contents($dir . 'index.php', "<?php // Silence is golden.\n");
-    }
+    return '';
 }
 
 // ========= HELPER =========
 // Flag impostato dopo la lettura delle opzioni dal DB (vedi VERIFICA ATTIVAZIONE).
 $GLOBALS['dbdm_em_trust_proxy'] = false;
 
-/**
- * IP del client per rate-limit e log.
- *
- * Di default usa SOLO REMOTE_ADDR: gli header X-Forwarded-For e
- * CF-Connecting-IP sono impostabili liberamente dal client e permetterebbero
- * di aggirare il rate-limit ruotando IP fittizi.
- *
- * Se l'admin ha attivato "sito dietro proxy/CDN fidato" (opzione
- * dbdm_emergency_trust_proxy), si usano gli header del proxy:
- * - CF-Connecting-IP se presente (impostato/sovrascritto da Cloudflare);
- * - altrimenti l'ULTIMO valore di X-Forwarded-For, cioè quello aggiunto
- *   dal proxy fidato più vicino al server (il primo è controllato dal client).
- */
 function dbdm_em_ip() {
-    if (!empty($GLOBALS['dbdm_em_trust_proxy'])) {
-        if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
-            $ip = trim($_SERVER['HTTP_CF_CONNECTING_IP']);
-            if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
-        }
-        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $parts = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-            $ip = trim(end($parts));
-            if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
-        }
-    }
-    if (!empty($_SERVER['REMOTE_ADDR'])) {
-        $ip = trim($_SERVER['REMOTE_ADDR']);
-        if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
-    }
-    return '0.0.0.0';
+    return DBDM_Emergency_Guard::client_ip($_SERVER, !empty($GLOBALS['dbdm_em_trust_proxy']));
 }
 
 function dbdm_em_log($event, $detail = '') {
@@ -118,54 +108,6 @@ function dbdm_em_log($event, $detail = '') {
     @file_put_contents(dbdm_em_private_path('emergency-access.log'), $line, FILE_APPEND | LOCK_EX);
 }
 
-function dbdm_em_read_rl() {
-    if (!file_exists(dbdm_em_private_path('emergency-ratelimit.json'))) return array();
-    $raw = @file_get_contents(dbdm_em_private_path('emergency-ratelimit.json'));
-    if (!$raw) return array();
-    $data = json_decode($raw, true);
-    return is_array($data) ? $data : array();
-}
-
-function dbdm_em_write_rl($data) {
-    @file_put_contents(dbdm_em_private_path('emergency-ratelimit.json'), json_encode($data), LOCK_EX);
-}
-
-function dbdm_em_is_locked($ip) {
-    $rl = dbdm_em_read_rl();
-    if (!isset($rl[$ip])) return false;
-    $entry = $rl[$ip];
-    if (($entry['count'] ?? 0) >= DBDM_EMERGENCY_MAX_ATTEMPTS) {
-        $since = time() - ($entry['first'] ?? 0);
-        if ($since < DBDM_EMERGENCY_LOCKOUT_SEC) {
-            return DBDM_EMERGENCY_LOCKOUT_SEC - $since;
-        }
-        // Expired: reset.
-        unset($rl[$ip]);
-        dbdm_em_write_rl($rl);
-    }
-    return false;
-}
-
-function dbdm_em_record_fail($ip) {
-    $rl = dbdm_em_read_rl();
-    if (!isset($rl[$ip])) {
-        $rl[$ip] = array('count' => 0, 'first' => time());
-    }
-    // Reset window after lockout expires.
-    if (time() - $rl[$ip]['first'] > DBDM_EMERGENCY_LOCKOUT_SEC) {
-        $rl[$ip] = array('count' => 0, 'first' => time());
-    }
-    ++$rl[$ip]['count'];
-    $rl[$ip]['last'] = time();
-    dbdm_em_write_rl($rl);
-}
-
-function dbdm_em_reset_fails($ip) {
-    $rl = dbdm_em_read_rl();
-    unset($rl[$ip]);
-    dbdm_em_write_rl($rl);
-}
-
 function dbdm_em_csrf_token() {
     if (empty($_SESSION['dbdm_csrf'])) {
         $_SESSION['dbdm_csrf'] = bin2hex(random_bytes(16));
@@ -174,13 +116,19 @@ function dbdm_em_csrf_token() {
 }
 
 function dbdm_em_csrf_check() {
-    $posted = isset($_POST['csrf']) ? $_POST['csrf'] : '';
-    return !empty($_SESSION['dbdm_csrf']) && hash_equals($_SESSION['dbdm_csrf'], $posted);
+    $posted = isset($_POST['csrf']) && is_string($_POST['csrf']) ? $_POST['csrf'] : '';
+    return !empty($_SESSION['dbdm_csrf']) && is_string($_SESSION['dbdm_csrf']) && hash_equals($_SESSION['dbdm_csrf'], $posted);
 }
 
 function dbdm_em_is_authed() {
     if (empty($_SESSION['dbdm_authed'])) return false;
     if (empty($_SESSION['dbdm_auth_time'])) return false;
+    // 1.4.0: la sessione decade se password, abilitazione o stato del
+    // plugin sono cambiati dopo il login (impronta legata all'epoca).
+    if (empty($_SESSION['dbdm_fingerprint']) || !hash_equals((string) $GLOBALS['dbdm_em_fingerprint'], (string) $_SESSION['dbdm_fingerprint'])) {
+        $_SESSION = array();
+        return false;
+    }
     if (time() - $_SESSION['dbdm_auth_time'] > DBDM_EMERGENCY_SESSION_TTL) {
         $_SESSION = array();
         return false;
@@ -212,12 +160,8 @@ function dbdm_em_get_option($pdo, $prefix, $name, $default = null) {
     $stmt->execute(array(':n' => $name));
     $v = $stmt->fetchColumn();
     if ($v === false) return $default;
-    // Possibile valore serializzato di PHP.
-    if (is_string($v) && preg_match('/^(a|s|i|b|N|O):/', $v)) {
-        $u = @unserialize($v);
-        if ($u !== false || $v === 'b:0;') return $u;
-    }
-    return $v;
+    // Valore serializzato: decodificato senza istanziare oggetti.
+    return DBDM_Emergency_Guard::maybe_unserialize($v);
 }
 
 $enabled = dbdm_em_get_option($pdo, $prefix, 'dbdm_emergency_enabled');
@@ -235,16 +179,32 @@ if (empty($stored_hash)) {
 // Modalità proxy fidato: da qui in poi dbdm_em_ip() può usare gli header proxy.
 $GLOBALS['dbdm_em_trust_proxy'] = (bool) dbdm_em_get_option($pdo, $prefix, 'dbdm_emergency_trust_proxy', false);
 
-// Cartella privata randomizzata: risolta dal token in wp_options.
-$dir_token = dbdm_em_get_option($pdo, $prefix, 'dbdm_private_dir_token', '');
-if (is_string($dir_token) && preg_match('/^[a-f0-9]{16}$/', $dir_token)) {
-    $GLOBALS['dbdm_em_private_dir'] = __DIR__ . '/private-' . $dir_token . '/';
+// Sessioni legate a password ed epoca (vedi dbdm_em_is_authed()).
+$GLOBALS['dbdm_em_fingerprint'] = DBDM_Emergency_Guard::session_fingerprint(
+    $stored_hash,
+    dbdm_em_get_option($pdo, $prefix, 'dbdm_emergency_epoch', '')
+);
+
+// Cartella privata (log accessi, limite tentativi, snapshot, backup).
+$GLOBALS['dbdm_em_private_dir'] = dbdm_em_resolve_private_dir(
+    dbdm_em_get_option($pdo, $prefix, 'dbdm_private_dir_path', ''),
+    dbdm_em_get_option($pdo, $prefix, 'dbdm_private_dir_token', '')
+);
+if (dbdm_em_private_dir() === '') {
+    dbdm_em_render_error('Cartella privata del plugin non trovata. Apri una volta il pannello Debug Manager da WordPress per crearla.');
+    exit;
 }
-dbdm_em_ensure_private_dir(dbdm_em_private_dir());
+if (!is_writable(dbdm_em_private_dir())) {
+    // Senza cartella scrivibile non c'è limite ai tentativi: accesso negato.
+    dbdm_em_render_error('La cartella privata del plugin non è scrivibile dal server web: accesso negato.');
+    exit;
+}
+$GLOBALS['dbdm_em_rl_file'] = dbdm_em_private_path('emergency-ratelimit.json');
 
 // ========= ROUTING =========
 $ip = dbdm_em_ip();
-$action = isset($_REQUEST['a']) ? preg_replace('/[^a-z_]/', '', $_REQUEST['a']) : '';
+$rl_key = DBDM_Emergency_Guard::rate_key($ip);
+$action = isset($_REQUEST['a']) && is_string($_REQUEST['a']) ? preg_replace('/[^a-z_]/', '', $_REQUEST['a']) : '';
 
 // Logout.
 if ($action === 'logout') {
@@ -261,21 +221,32 @@ if (!dbdm_em_is_authed() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POS
         dbdm_em_render_login('Token di sessione non valido. Ricarica la pagina.');
         exit;
     }
-    $lock = dbdm_em_is_locked($ip);
-    if ($lock !== false) {
-        dbdm_em_log('LOGIN_BLOCKED', 'IP locked, ' . $lock . 's remaining');
-        dbdm_em_render_login('Troppi tentativi. Riprova tra ' . ceil($lock/60) . ' minuti.');
+    // 1.4.0: il tentativo viene contato PRIMA della verifica, sotto lock:
+    // anche con richieste parallele non si superano i 5 tentativi.
+    $attempt = DBDM_Emergency_Guard::reserve_attempt($GLOBALS['dbdm_em_rl_file'], $rl_key);
+    if ($attempt['error'] !== '') {
+        dbdm_em_log('LOGIN_REFUSED', 'rate limit non disponibile');
+        dbdm_em_render_login('Limite dei tentativi non disponibile: accesso negato.');
         exit;
     }
-    if (password_verify($_POST['password'], $stored_hash)) {
+    if (!$attempt['allowed']) {
+        dbdm_em_log('LOGIN_BLOCKED', 'IP locked, ' . $attempt['retry_after'] . 's remaining');
+        dbdm_em_render_login('Troppi tentativi. Riprova tra ' . ceil($attempt['retry_after'] / 60) . ' minuti.');
+        exit;
+    }
+    $password = is_string($_POST['password']) ? $_POST['password'] : '';
+    if ($password !== '' && password_verify($password, $stored_hash)) {
+        // 1.4.0: nuovo ID di sessione al login (niente session fixation).
+        session_regenerate_id(true);
         $_SESSION['dbdm_authed'] = true;
         $_SESSION['dbdm_auth_time'] = time();
-        dbdm_em_reset_fails($ip);
+        $_SESSION['dbdm_fingerprint'] = $GLOBALS['dbdm_em_fingerprint'];
+        unset($_SESSION['dbdm_csrf']);
+        DBDM_Emergency_Guard::reset($GLOBALS['dbdm_em_rl_file'], $rl_key);
         dbdm_em_log('LOGIN_SUCCESS');
         header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
         exit;
     } else {
-        dbdm_em_record_fail($ip);
         dbdm_em_log('LOGIN_FAIL');
         dbdm_em_render_login('Password errata.');
         exit;
@@ -283,8 +254,8 @@ if (!dbdm_em_is_authed() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POS
 }
 
 if (!dbdm_em_is_authed()) {
-    $lock = dbdm_em_is_locked($ip);
-    dbdm_em_render_login($lock !== false ? 'IP bloccato. Riprova tra ' . ceil($lock/60) . ' minuti.' : '');
+    $lock = DBDM_Emergency_Guard::locked_for($GLOBALS['dbdm_em_rl_file'], $rl_key);
+    dbdm_em_render_login($lock > 0 ? 'IP bloccato. Riprova tra ' . ceil($lock / 60) . ' minuti.' : '');
     exit;
 }
 
@@ -309,7 +280,7 @@ if ($is_post && dbdm_em_csrf_check()) {
                 if ($slug) {
                     $stmt = $pdo->prepare("SELECT option_value FROM `{$prefix}options` WHERE option_name = 'active_plugins'");
                     $stmt->execute();
-                    $current = @unserialize($stmt->fetchColumn());
+                    $current = DBDM_Emergency_Guard::maybe_unserialize($stmt->fetchColumn());
                     if (is_array($current)) {
                         $new = array_values(array_filter($current, function ($p) use ($slug) {
  return $p !== $slug;
@@ -376,7 +347,7 @@ break;
                 break;
 
             case 'clear_log':
-                $log_path = dirname(dirname(__DIR__)) . '/debug.log';
+                $log_path = dbdm_em_debug_log_path($config_path);
                 if (file_exists($log_path) && is_writable($log_path)) {
                     file_put_contents($log_path, '');
                     dbdm_em_log('ACTION', 'clear_debug_log');
@@ -413,37 +384,30 @@ break; }
                     break;
                 }
 
-                // Ripristina plugin attivi.
+                // Ripristina plugin attivi. 1.4.0: solo percorsi validi di
+                // plugin ancora installati (niente cartelle, risalite, non-stringhe).
                 if ($restore_plugins && isset($target['active_plugins'])) {
-                    // Filtro: solo plugin ancora presenti nel filesystem.
-                    $plugins_dir = dirname(__DIR__);
-                    $valid_plugins = array();
-                    foreach ((array) $target['active_plugins'] as $p) {
-                        $plugin_file = $plugins_dir . '/' . $p;
-                        if (file_exists($plugin_file)) {
-                            $valid_plugins[] = $p;
-                        }
-                    }
+                    list($valid_plugins, $missing) = DBDM_Emergency_Guard::restorable_plugins($target['active_plugins'], dirname(__DIR__));
                     $pdo->prepare("UPDATE `{$prefix}options` SET option_value = :v WHERE option_name = 'active_plugins'")
                         ->execute(array(':v' => serialize($valid_plugins)));
                     dbdm_em_log('ACTION', 'restore_snapshot plugins: ' . $snap_id . ', ' . count($valid_plugins) . ' plugins');
                     $notices[] = array('ok', 'Plugin attivi ripristinati: ' . count($valid_plugins) . ' plugin.');
-                    $missing = array_diff((array) $target['active_plugins'], $valid_plugins);
                     if (!empty($missing)) {
-                        $notices[] = array('err', 'Non ripristinati (non più presenti): ' . implode(', ', $missing));
+                        $notices[] = array('err', 'Non ripristinati (non più presenti o non validi): ' . implode(', ', $missing));
                     }
                 }
 
-                // Ripristina tema.
-                if ($restore_theme && !empty($target['stylesheet'])) {
-                    $themes_dir = dirname(dirname(__DIR__)) . '/themes';
-                    if (is_dir($themes_dir . '/' . $target['stylesheet'])) {
-                        $pdo->prepare("UPDATE `{$prefix}options` SET option_value = :v WHERE option_name = 'stylesheet'")->execute(array(':v' => $target['stylesheet']));
-                        $pdo->prepare("UPDATE `{$prefix}options` SET option_value = :v WHERE option_name = 'template'")->execute(array(':v' => $target['template'] ?? $target['stylesheet']));
-                        dbdm_em_log('ACTION', 'restore_snapshot theme: ' . $target['stylesheet']);
-                        $notices[] = array('ok', 'Tema ripristinato: ' . $target['stylesheet']);
+                // Ripristina tema. 1.4.0: il tema padre viene letto dal tema e
+                // deve essere installato, altrimenti il sito resterebbe bianco.
+                if ($restore_theme && isset($target['stylesheet'])) {
+                    $theme = DBDM_Emergency_Guard::restorable_theme($target['stylesheet'], DBDM_EMERGENCY_CONTENT_DIR . '/themes');
+                    if ($theme['ok']) {
+                        $pdo->prepare("UPDATE `{$prefix}options` SET option_value = :v WHERE option_name = 'stylesheet'")->execute(array(':v' => $theme['stylesheet']));
+                        $pdo->prepare("UPDATE `{$prefix}options` SET option_value = :v WHERE option_name = 'template'")->execute(array(':v' => $theme['template']));
+                        dbdm_em_log('ACTION', 'restore_snapshot theme: ' . $theme['stylesheet']);
+                        $notices[] = array('ok', 'Tema ripristinato: ' . $theme['stylesheet']);
                     } else {
-                        $notices[] = array('err', 'Tema non più installato: ' . $target['stylesheet']);
+                        $notices[] = array('err', 'Tema non ripristinato (' . $theme['error'] . '): ' . $theme['stylesheet']);
                     }
                 }
                 break;
@@ -458,10 +422,20 @@ break; }
 // che include la validazione sintattica PHP pre-scrittura (in emergency un
 // wp-config rotto sarebbe il caso peggiore possibile).
 function dbdm_em_toggle_constant($config_path, $name, $value) {
-    $result = DBDM_Standalone_Config::set_bool_constant(
+    global $pdo, $prefix;
+    $source = $value ? 'true' : 'false';
+    // 1.4.0: WP_DEBUG_LOG attivato va nella cartella privata (o sul percorso
+    // personalizzato ricordato dal pannello), non in wp-content/debug.log
+    // raggiungibile da chiunque.
+    if ($name === 'WP_DEBUG_LOG' && $value) {
+        $saved = dbdm_em_get_option($pdo, $prefix, 'dbdm_debug_log_path', '');
+        $path  = is_string($saved) && $saved !== '' && !in_array(strtolower($saved), array('1', 'true'), true)
+            ? $saved : dbdm_em_private_path('debug.log');
+        $source = var_export($path, true);
+    }
+    $result = DBDM_Standalone_Config::set_constants(
         $config_path,
-        $name,
-        (bool) $value,
+        array($name => $source),
         dbdm_em_private_path('wp-config.dbdm-bak')
     );
     // Rimuove l'eventuale backup legacy esposto (versioni <= 1.2.0).
@@ -471,8 +445,22 @@ function dbdm_em_toggle_constant($config_path, $name, $value) {
     return $result;
 }
 
+/**
+ * Percorso del debug.log come lo usa WordPress con il wp-config.php
+ * attuale: un percorso in WP_DEBUG_LOG, altrimenti wp-content/debug.log.
+ */
+function dbdm_em_debug_log_path($config_path) {
+    $content = @file_get_contents($config_path);
+    $defines = $content ? DBDM_Standalone_Config::effective_defines($content) : array();
+    $value   = isset($defines['WP_DEBUG_LOG']) ? $defines['WP_DEBUG_LOG'] : null;
+    if (is_string($value) && $value !== '' && !in_array(strtolower($value), array('1', 'true'), true)) {
+        return $value;
+    }
+    return DBDM_EMERGENCY_CONTENT_DIR . '/debug.log';
+}
+
 // ========= RACCOLTA DATI PER VISTA =========
-$debug_log_path = dirname(dirname(__DIR__)) . '/debug.log';
+$debug_log_path = dbdm_em_debug_log_path($config_path);
 $debug_log_content = '';
 $debug_log_size = 0;
 if (file_exists($debug_log_path)) {
@@ -491,7 +479,7 @@ if (file_exists($debug_log_path)) {
 $active_plugins = array();
 $stmt = $pdo->prepare("SELECT option_value FROM `{$prefix}options` WHERE option_name = 'active_plugins'");
 $stmt->execute();
-$ap = @unserialize($stmt->fetchColumn());
+$ap = DBDM_Emergency_Guard::maybe_unserialize($stmt->fetchColumn());
 if (is_array($ap)) $active_plugins = $ap;
 
 // Tema attuale.
