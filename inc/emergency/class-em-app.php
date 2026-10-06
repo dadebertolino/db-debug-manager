@@ -187,17 +187,29 @@ class DBDM_Em_App {
             return;
         }
 
-        // Azioni: tutte quelle che modificano lo stato richiedono POST + CSRF.
-        $notices = array();
-        if ($request->is_post() && $session->csrf_check($request->post_string('csrf'))) {
-            $actions = new DBDM_Em_Actions($repo, $logger, $paths + array(
-                'config_path' => $config_path,
-                'private_dir' => $private_dir,
-            ));
-            $notices = $actions->run($action, $request);
-        }
+        $actions = new DBDM_Em_Actions($repo, $logger, $paths + array(
+            'config_path' => $config_path,
+            'private_dir' => $private_dir,
+        ));
+        $notices = self::handle_actions($request, $session, $actions, $logger);
 
         $view->dashboard($notices, DBDM_Em_Status::collect($repo, $config_path, $paths['content_dir'], $private_dir));
+    }
+
+    /**
+     * Azioni della dashboard: solo in POST e con token CSRF valido. 2.0.0
+     * (bug 30): un token scaduto o mancante non passa più in silenzio.
+     *
+     * @return array[] Avvisi.
+     */
+    public static function handle_actions(DBDM_Em_Request $request, DBDM_Em_Session $session, DBDM_Em_Actions $actions, DBDM_Em_Logger $logger) {
+        $action = $request->action();
+        if (!$request->is_post() || $action === '') return array();
+        if (!$session->csrf_check($request->post_string('csrf'))) {
+            $logger->log('ACTION_CSRF_FAIL', $action);
+            return array(array('err', 'Modulo scaduto: azione non eseguita. Riprova.'));
+        }
+        return $actions->run($action, $request);
     }
 
     private function redirect(DBDM_Em_Request $request) {

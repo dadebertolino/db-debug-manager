@@ -154,16 +154,62 @@ class EmergencyActionsTest extends TestCase {
 	}
 
 	public function test_disattiva_un_plugin(): void {
-		$notices = $this->run_action( 'disable_plugin', array( 'plugin' => 'a/a.php' ) );
+		$notices = $this->run_action( 'disable_plugin', array( 'plugin' => bin2hex( 'a/a.php' ) ) );
 
 		$this->assertSame( array( array( 'ok', 'Plugin disattivato: a/a.php' ) ), $notices );
 		$this->assertSame( array( 'b/b.php' ), $this->repo->get_option( 'active_plugins' ) );
 	}
 
-	public function test_disattiva_un_plugin_senza_slug_o_con_array(): void {
-		$this->assertSame( array(), $this->run_action( 'disable_plugin' ) );
-		$this->assertSame( array(), $this->run_action( 'disable_plugin', array( 'plugin' => array( 'a/a.php' ) ) ) );
+	/**
+	 * Bug 30: lo slug arriva in esadecimale, così anche un nome con byte non
+	 * UTF-8 (mostrato con caratteri sostituiti) torna identico.
+	 */
+	public function test_disattiva_un_plugin_con_nome_non_utf8(): void {
+		$this->repo->update_option( 'active_plugins', array( "latin\xE9/x.php", 'b/b.php' ) );
+		$notices = $this->run_action( 'disable_plugin', array( 'plugin' => bin2hex( "latin\xE9/x.php" ) ) );
+
+		$this->assertSame( 'ok', $notices[0][0] );
+		$this->assertSame( array( 'b/b.php' ), $this->repo->get_option( 'active_plugins' ) );
+	}
+
+	/**
+	 * Bug 30: niente "disattivato" se il plugin non era attivo.
+	 */
+	public function test_disattiva_un_plugin_non_attivo(): void {
+		$notices = $this->run_action( 'disable_plugin', array( 'plugin' => bin2hex( 'c/c.php' ) ) );
+
+		$this->assertSame( array( array( 'warn', 'Il plugin non era attivo: c/c.php' ) ), $notices );
 		$this->assertSame( array( 'a/a.php', 'b/b.php' ), $this->repo->get_option( 'active_plugins' ) );
+		$this->assertStringNotContainsString( 'disable_plugin', $this->access_log() );
+	}
+
+	/**
+	 * @dataProvider plugin_non_indicati
+	 */
+	public function test_disattiva_un_plugin_senza_slug_valido( $post ): void {
+		$this->assertSame( array( array( 'err', 'Plugin non indicato.' ) ), $this->run_action( 'disable_plugin', $post ) );
+		$this->assertSame( array( 'a/a.php', 'b/b.php' ), $this->repo->get_option( 'active_plugins' ) );
+	}
+
+	public function plugin_non_indicati() {
+		return array(
+			'assente'        => array( array() ),
+			'array'          => array( array( 'plugin' => array( bin2hex( 'a/a.php' ) ) ) ),
+			'non esadecimale' => array( array( 'plugin' => 'a/a.php' ) ),
+			'dispari'        => array( array( 'plugin' => 'abc' ) ),
+		);
+	}
+
+	public function test_plugin_attivi_illeggibili(): void {
+		$this->pdo->exec( "UPDATE wp_options SET option_value = 'rotto' WHERE option_name = 'active_plugins'" );
+		$this->assertSame( 'err', $this->run_action( 'disable_plugin', array( 'plugin' => bin2hex( 'a/a.php' ) ) )[0][0] );
+		$this->assertSame( 'err', $this->run_action( 'disable_all_plugins' )[0][0] );
+		$this->assertSame( 'rotto', $this->raw( 'active_plugins' ) );
+	}
+
+	public function test_disattiva_tutti_senza_plugin_attivi(): void {
+		$this->repo->update_option( 'active_plugins', array() );
+		$this->assertSame( array( array( 'warn', 'Nessun plugin era attivo.' ) ), $this->run_action( 'disable_all_plugins' ) );
 	}
 
 	/* --- Tema ---------------------------------------------------------------- */
@@ -235,6 +281,11 @@ class EmergencyActionsTest extends TestCase {
 	}
 
 	/* --- Transient ----------------------------------------------------------- */
+
+	public function test_nessun_transient_da_eliminare(): void {
+		$this->run_action( 'clear_transients' );
+		$this->assertSame( array( array( 'warn', 'Nessun transient da eliminare.' ) ), $this->run_action( 'clear_transients' ) );
+	}
 
 	public function test_svuota_i_transient(): void {
 		$notices = $this->run_action( 'clear_transients' );
@@ -323,6 +374,11 @@ class EmergencyActionsTest extends TestCase {
 		$this->assertSame( '', file_get_contents( $this->content . '/debug.log' ) );
 	}
 
+	public function test_svuota_un_debug_log_gia_vuoto(): void {
+		touch( $this->content . '/debug.log' );
+		$this->assertSame( array( array( 'warn', 'debug.log era già vuoto.' ) ), $this->run_action( 'clear_log' ) );
+	}
+
 	public function test_svuota_un_debug_log_assente(): void {
 		$this->assertSame( 'err', $this->run_action( 'clear_log' )[0][0] );
 	}
@@ -399,10 +455,54 @@ class EmergencyActionsTest extends TestCase {
 		);
 	}
 
+	/* --- Smistamento delle azioni (bug 30) --------------------------------- */
+
+	private function handle( array $post, $method = 'POST' ) {
+		$store   = array();
+		$session = new DBDM_Em_Session( $store );
+		$token   = $session->csrf_token();
+		if ( isset( $post['csrf'] ) && true === $post['csrf'] ) {
+			$post['csrf'] = $token;
+		}
+		$logger  = new DBDM_Em_Logger( $this->private . 'emergency-access.log', '203.0.113.5', 'test' );
+		$actions = new DBDM_Em_Actions(
+			$this->repo,
+			$logger,
+			array(
+				'config_path' => $this->config,
+				'private_dir' => $this->private,
+				'content_dir' => $this->content,
+				'plugins_dir' => $this->content . '/plugins',
+				'themes_dir'  => $this->content . '/temi',
+			)
+		);
+		return DBDM_Em_App::handle_actions( new DBDM_Em_Request( array(), $post, array( 'REQUEST_METHOD' => $method ) ), $session, $actions, $logger );
+	}
+
+	public function test_azione_con_token_valido_eseguita(): void {
+		$notices = $this->handle( array( 'a' => 'disable_all_plugins', 'csrf' => true ) );
+		$this->assertSame( 'ok', $notices[0][0] );
+		$this->assertSame( array(), $this->repo->get_option( 'active_plugins' ) );
+	}
+
+	public function test_token_scaduto_segnalato_e_azione_non_eseguita(): void {
+		$notices = $this->handle( array( 'a' => 'disable_all_plugins', 'csrf' => 'scaduto' ) );
+
+		$this->assertSame( array( array( 'err', 'Modulo scaduto: azione non eseguita. Riprova.' ) ), $notices );
+		$this->assertSame( array( 'a/a.php', 'b/b.php' ), $this->repo->get_option( 'active_plugins' ) );
+		$this->assertStringContainsString( 'ACTION_CSRF_FAIL | IP=203.0.113.5 | UA=test | disable_all_plugins', $this->access_log() );
+	}
+
+	public function test_senza_post_o_senza_azione_nessun_avviso(): void {
+		$this->assertSame( array(), $this->handle( array( 'a' => 'disable_all_plugins', 'csrf' => true ), 'GET' ) );
+		$this->assertSame( array(), $this->handle( array( 'csrf' => 'qualsiasi' ) ) );
+		$this->assertSame( array( 'a/a.php', 'b/b.php' ), $this->repo->get_option( 'active_plugins' ) );
+	}
+
 	/* --- Errori -------------------------------------------------------------- */
 
 	public function test_azione_sconosciuta(): void {
-		$this->assertSame( array(), $this->run_action( 'drop_database' ) );
+		$this->assertSame( array( array( 'err', 'Azione non riconosciuta.' ) ), $this->run_action( 'drop_database' ) );
 	}
 
 	public function test_eccezione_del_database_riportata_e_registrata(): void {

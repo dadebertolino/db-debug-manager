@@ -280,7 +280,7 @@ class EmergencyCoreTest extends TestCase {
 		$view  = new DBDM_Em_View( new DBDM_Em_Session( $store ) );
 		$html  = $this->render( function () use ( $view ) {
 			$view->dashboard(
-				array( array( 'ok', 'Fatto.' ), array( 'err', 'No <b>' ) ),
+				array( array( 'ok', 'Fatto.' ), array( 'err', 'No <b>' ), array( 'warn', 'Niente da fare.' ) ),
 				array(
 					'log_content'     => "PHP Notice: <img src=x>\n",
 					'log_size'        => 2048,
@@ -295,6 +295,8 @@ class EmergencyCoreTest extends TestCase {
 		} );
 		$this->assertStringContainsString( '<div class="notice notice-ok">Fatto.</div>', $html );
 		$this->assertStringContainsString( '<div class="notice notice-err">No &lt;b&gt;</div>', $html );
+		$this->assertStringContainsString( '<div class="notice notice-warn">Niente da fare.</div>', $html );
+		$this->assertStringContainsString( 'name="plugin" value="' . bin2hex( 'a/a.php' ) . '"', $html, 'slug in esadecimale (bug 30)' );
 		$this->assertStringContainsString( 'PHP Notice: &lt;img src=x&gt;', $html );
 		$this->assertStringContainsString( 'Plugin attivi (2)', $html );
 		$this->assertStringContainsString( 'Snapshot disponibili (1)', $html );

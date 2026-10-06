@@ -85,7 +85,7 @@ class DBDM_Em_View {
     </div>
 
     <?php foreach ($notices as $n): ?>
-        <div class="notice notice-<?php echo $n[0] === 'ok' ? 'ok' : 'err'; ?>"><?php echo htmlspecialchars($n[1], ENT_QUOTES | ENT_SUBSTITUTE); ?></div>
+        <div class="notice notice-<?php echo in_array($n[0], array('ok', 'warn'), true) ? $n[0] : 'err'; ?>"><?php echo htmlspecialchars($n[1], ENT_QUOTES | ENT_SUBSTITUTE); ?></div>
     <?php endforeach; ?>
 
     <div class="panel panel-danger">
@@ -222,7 +222,7 @@ class DBDM_Em_View {
                                 <form method="post" style="display:inline;" onsubmit="return confirm(<?php echo $this->js_string('Disattivare ' . $p . '?'); ?>);">
                                     <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES | ENT_SUBSTITUTE); ?>">
                                     <input type="hidden" name="a" value="disable_plugin">
-                                    <input type="hidden" name="plugin" value="<?php echo htmlspecialchars($p, ENT_QUOTES | ENT_SUBSTITUTE); ?>">
+                                    <input type="hidden" name="plugin" value="<?php echo bin2hex($p); ?>">
                                     <button type="submit" class="btn btn-danger btn-sm">Disattiva</button>
                                 </form>
                             </td>

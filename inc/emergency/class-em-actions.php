@@ -4,8 +4,8 @@
  *
  * Disattivazione dei plugin, cambio di tema, transient, costanti di debug,
  * debug.log, ripristino di uno snapshot. Ogni azione restituisce gli avvisi
- * da mostrare (array(tipo, messaggio), tipo 'ok' o 'err'). CSRF e login
- * sono verificati prima, da DBDM_Em_App.
+ * da mostrare: array(tipo, messaggio), tipo 'ok' (eseguita), 'warn' (nulla
+ * da cambiare) o 'err'. CSRF e login sono verificati prima, da DBDM_Em_App.
  *
  * @since 2.0.0
  */
@@ -56,7 +56,7 @@ class DBDM_Em_Actions {
     }
 
     /**
-     * Esegue l'azione richiesta. Un'azione sconosciuta non fa nulla.
+     * Esegue l'azione richiesta.
      *
      * @return array[] Avvisi.
      */
@@ -70,7 +70,7 @@ class DBDM_Em_Actions {
             'clear_log'               => 'clear_log',
             'restore_snapshot'        => 'restore_snapshot',
         );
-        if (!isset($methods[$action])) return array();
+        if (!isset($methods[$action])) return array(array('err', 'Azione non riconosciuta.'));
         try {
             return $this->{$methods[$action]}($request);
         } catch (Exception $e) {
@@ -80,22 +80,38 @@ class DBDM_Em_Actions {
     }
 
     private function disable_all_plugins(DBDM_Em_Request $request) {
+        $current = $this->repo->active_plugins();
+        if ($current === null) return array(self::unreadable_plugins());
+        if (!$current) return array(array('warn', 'Nessun plugin era attivo.'));
         $this->repo->update_option('active_plugins', array());
         $this->logger->log('ACTION', 'disable_all_plugins');
         return array(array('ok', 'Tutti i plugin sono stati disattivati.'));
     }
 
+    /**
+     * Il modulo invia lo slug in esadecimale (DBDM_Em_View): torna identico
+     * anche con byte non UTF-8, che la pagina mostra sostituiti.
+     */
     private function disable_plugin(DBDM_Em_Request $request) {
-        $slug = $request->post_string('plugin');
-        if ($slug === '') return array();
+        $key  = $request->post_string('plugin');
+        $slug = $key !== '' && strlen($key) % 2 === 0 && ctype_xdigit($key) ? hex2bin($key) : '';
+        if ($slug === '' || $slug === false) return array(array('err', 'Plugin non indicato.'));
+
         $current = $this->repo->active_plugins();
-        if ($current === null) return array();
+        if ($current === null) return array(self::unreadable_plugins());
+        if (!in_array($slug, $current, true)) {
+            return array(array('warn', 'Il plugin non era attivo: ' . $slug));
+        }
         $new = array_values(array_filter($current, function ($p) use ($slug) {
             return $p !== $slug;
         }));
         $this->repo->update_option('active_plugins', $new);
         $this->logger->log('ACTION', 'disable_plugin: ' . $slug);
         return array(array('ok', 'Plugin disattivato: ' . $slug));
+    }
+
+    private static function unreadable_plugins() {
+        return array('err', 'Elenco dei plugin attivi mancante o illeggibile nel database: nessuna modifica.');
     }
 
     private function switch_to_default_theme(DBDM_Em_Request $request) {
@@ -133,6 +149,7 @@ class DBDM_Em_Actions {
 
     private function clear_transients(DBDM_Em_Request $request) {
         $deleted = $this->repo->delete_transients();
+        if ($deleted === 0) return array(array('warn', 'Nessun transient da eliminare.'));
         $this->logger->log('ACTION', 'clear_transients: ' . $deleted);
         return array(array('ok', $deleted . ' transient eliminati.'));
     }
@@ -193,6 +210,9 @@ class DBDM_Em_Actions {
         $log_path = DBDM_Em_Status::debug_log_path($this->config_path, $this->content_dir);
         if (!file_exists($log_path) || !is_writable($log_path)) {
             return array(array('err', 'debug.log non scrivibile o assente.'));
+        }
+        if (filesize($log_path) === 0) {
+            return array(array('warn', 'debug.log era già vuoto.'));
         }
         file_put_contents($log_path, '');
         $this->logger->log('ACTION', 'clear_debug_log');
