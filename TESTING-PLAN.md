@@ -186,11 +186,11 @@ dichiarato oggi) non supporta PHPUnit 9, un motivo in più per il passaggio a
 `emergency.php` esegue sessione, I/O ed `exit` al caricamento: le sue
 funzioni non si possono testare. Prima dei test:
 
-- [ ] estrarre da `emergency.php` classi includibili senza effetti
+- [x] estrarre da `emergency.php` classi includibili senza effetti
       (`inc/emergency/`): richiesta/IP, rate limit con orologio e storage
       iniettabili e lock, sessione, CSRF, azioni sul DB, rendering; il file
       `emergency.php` resta un punto d'ingresso sottile;
-- [ ] in `DBDM_Standalone_Config`: parser di `wp-config.php` basato su
+- [x] in `DBDM_Standalone_Config` (fatto nella Fase A): parser di `wp-config.php` basato su
       `token_get_all` (commenti e condizionali esclusi, `getenv`/`getenv_docker`
       risolti), costruttore del DSN puro, writer atomico (temp + `rename`,
       lock, verifica dei byte, backup verificato prima di scrivere), lint
@@ -198,16 +198,21 @@ funzioni non si possono testare. Prima dei test:
 
 Ordine dei commit nel branch `fase-1-refactor`:
 
-1. [ ] refactor senza cambi di comportamento: `Request` (input tipizzato,
+1. [x] refactor senza cambi di comportamento: `Request` (input tipizzato,
        IP tramite `DBDM_Emergency_Guard`), `Session` (strict, epoca,
        logout), `Csrf`, `Repository` (opzioni e transient via PDO), `Actions`
        (una per azione, esito *cambiato / nessun effetto / errore*), `View`,
        `App` (router); i 23 E2E esistenti invariati e verdi;
-2. [ ] unit sulle nuove classi; `Repository` e `Actions` su PDO SQLite in
+2. [x] unit sulle nuove classi; `Repository` e `Actions` su PDO SQLite in
        memoria (disponibile in locale, MySQL no);
-3. [ ] bug dell'emergency, uno per commit con test rosso prima: 18–21, 27,
+3. [x] bug dell'emergency, uno per commit con test rosso prima: 18–21, 27,
        28, 30, 31, 33 (resto), 34–38;
-4. [ ] bug unit di costanti e log: 6, 7, 9, 50, 52.
+4. [x] bug unit di costanti e log: 6, 7 (in parte), 9, 50, 52.
+
+Fatto (2026-10-06): 8 classi in `inc/emergency/` (`DBDM_Em_Request`,
+`_Session`, `_Repository`, `_Logger`, `_Status`, `_Actions`, `_View`,
+`_App`; CSRF dentro la sessione), unit da 68 a 180, bug 6, 9, 18–21, 27,
+28, 30, 31, 33–38, 50, 52 e il nuovo 60 corretti; 7 in parte.
 
 Restano alla Fase 2: 26 (multisite dell'emergency), 45–49, 51, 55, 56. Alla
 Fase 3: 43, 44, 53, 54, 57–59.
