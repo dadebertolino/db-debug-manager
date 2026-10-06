@@ -156,6 +156,9 @@ db-debug-manager/
 
 ## Changelog
 
+### Non rilasciata
+- **Aggiornamenti dal pannello:** `DB_GitHub_Updater` 1.1.0, lo stesso di DB Privacy Hub 1.8.0. Dopo un aggiornamento il plugin viene riattivato solo se era attivo (prima veniva attivato anche se l'admin l'aveva disattivato), anche per l'attivazione di rete; release senza ZIP ignorate invece di generare un errore; nessun errore se il filesystem di WordPress non è disponibile.
+
 ### 1.3.2 — 2026-07-17
 - **CI/QA:** aggiunti GitHub Actions: lint PHP su 7.4 e 8.3, PHPCS con ruleset WPCS (`phpcs.xml.dist`: sicurezza ed escaping bloccanti, stile del progetto preservato) e workflow di release che builda lo ZIP con la cartella `db-debug-manager/` e lo allega alla Release (richiesto dall'auto-updater, che preferisce l'asset .zip allo zipball).
 - **Conformità WPCS:** aggiunti `wp_unslash`/sanitizzazione sugli input, `esc_html__` nei `wp_die`, rinominate variabili che sovrascrivevano global WordPress (`$status`, `$s`, `$m`, `$descriptions`), eliminati short ternary. Nessun cambiamento funzionale (suite di regressione completa verde).
