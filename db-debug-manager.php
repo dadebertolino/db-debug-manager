@@ -3,7 +3,7 @@
  * Plugin Name: DB Debug Manager
  * Plugin URI: https://www.davidebertolino.it/progetti/
  * Description: Gestione centralizzata del debug di WordPress: abilita/disabilita WP_DEBUG, WP_DEBUG_LOG, WP_DEBUG_DISPLAY, SCRIPT_DEBUG, SAVEQUERIES direttamente dal pannello, con viewer del debug.log e monitor delle query SQL.
- * Version: 1.4.0
+ * Version: 2.0.0
  * Author: Davide Bertolino
  * Author URI: https://www.davidebertolino.it
  * License: GPL v2 or later
@@ -16,7 +16,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('DBDM_VERSION', '1.4.0');
+define('DBDM_VERSION', '2.0.0');
 define('DBDM_PLUGIN_FILE', __FILE__);
 define('DBDM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DBDM_PLUGIN_URL', plugin_dir_url(__FILE__));

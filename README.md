@@ -3,7 +3,7 @@
 Plugin WordPress per gestire il debug direttamente dal pannello di amministrazione, senza più aprire l'FTP per modificare `wp-config.php` o scaricare `debug.log`. Include un **sistema di accesso emergency standalone** che funziona anche quando WordPress è crashato.
 
 **Autore:** Davide Bertolino · [davidebertolino.it](https://www.davidebertolino.it)
-**Versione:** 1.4.0
+**Versione:** 2.0.0
 **Licenza:** GPL v2 or later
 
 ---
@@ -13,23 +13,24 @@ Plugin WordPress per gestire il debug direttamente dal pannello di amministrazio
 ### Gestione debug standard
 - **Toggle delle costanti** (`WP_DEBUG`, `WP_DEBUG_LOG`, `WP_DEBUG_DISPLAY`, `SCRIPT_DEBUG`, `SAVEQUERIES`) con salvataggio diretto in `wp-config.php`.
 - **Viewer del `debug.log`** in tempo reale, con filtro, auto-refresh ogni 5 secondi, download e svuotamento.
-- **Query Monitor**: snapshot delle query SQL eseguite sull'ultima pagina frontend. Evidenzia le query lente (>50ms) e mostra il caller stack.
+- **Query Monitor**: query SQL dell'ultima pagina del sito visitata da te, mentre la registrazione è attiva (30 minuti, mai le visite degli altri, il login, REST e AJAX). Evidenzia le query lente (>50ms) e mostra il caller stack.
 - **Backup automatico** di `wp-config.php` prima di ogni modifica (nella cartella privata randomizzata, deny-all): se il backup non riesce, `wp-config.php` non viene toccato.
 - **Scrittura sicura** di `wp-config.php`: lettura con il tokenizer di PHP (commenti, `define` condizionali e valori da `getenv()` riconosciuti), scrittura atomica, controllo di sintassi prima di salvare.
 - **Debug log privato**: attivando `WP_DEBUG_LOG` dal pannello il log va nella cartella privata, non in `/wp-content/debug.log` raggiungibile da chiunque.
 
-### Emergency Access (v1.1.0)
+### Emergency Access
 - File **standalone** (`emergency.php`) che **non carica WordPress**: funziona anche quando il sito è crashato.
 - Connessione PDO diretta al DB usando credenziali estratte da `wp-config.php`.
 - Autenticazione con password (hash bcrypt), rate-limit, log accessi, CSRF.
-- Azioni disponibili: vedere `debug.log`, vedere il PHP error log del server, disattivare tutti i plugin, disattivare un singolo plugin, cambiare al tema default, svuotare i transient, toggle delle costanti debug.
+- Azioni disponibili: vedere `debug.log`, vedere il PHP error log del server (solo le voci del sito), disattivare tutti i plugin, disattivare un singolo plugin, cambiare al tema default, svuotare i transient, toggle delle costanti debug, ripristinare uno snapshot.
+- In multisite vede e disattiva anche i plugin attivi in rete.
 
-### Preflight Snapshots (novità v1.2.0)
+### Preflight Snapshots
 - Cattura lo **stato del sito** (plugin attivi + tema + versioni di tutti i plugin/temi installati).
-- **Tre trigger**: manuale dal pannello, automatico quando attivi l'Emergency Access, automatico dopo ogni aggiornamento completato da WordPress.
-- Storico degli **ultimi 5 snapshot** (FIFO, deduplicazione se lo stato non è cambiato).
+- **Trigger**: manuale dal pannello, automatico quando attivi l'Emergency Access, automatico **prima** di aggiornare o installare plugin e temi (uno per richiesta, anche negli aggiornamenti in blocco) e dopo un aggiornamento del core.
+- Storico degli **ultimi 5 snapshot manuali e degli ultimi 5 automatici** (gli automatici non espellono i manuali; deduplicazione se lo stato non è cambiato).
 - **Diff visuale** rispetto allo stato attuale: plugin attivati/disattivati, plugin aggiornati con versioni from/to, tema cambiato.
-- **Rollback selettivo**: scegli se ripristinare solo i plugin attivi, solo il tema o entrambi.
+- **Rollback selettivo**: scegli se ripristinare solo i plugin attivi, solo il tema o entrambi. I plugin vengono attivati e disattivati come dalla pagina Plugin (con i loro hook); in multisite anche quelli attivi in rete.
 - **Disponibile anche dall'Emergency standalone** — puoi ripristinare uno snapshot anche quando WordPress è down.
 
 ## Installazione
@@ -60,7 +61,7 @@ La prima volta che viene generato un errore con `WP_DEBUG_LOG` attiva, WordPress
 - **Scarica** / **Svuota** in un click.
 
 ### Tab Query SQL
-Attiva `SAVEQUERIES` dalla tab Costanti, poi visita una pagina frontend. Torna in **Debug Manager → Query SQL** per vedere SQL eseguite, tempi e caller. Snapshot conservato 1 ora come transient.
+Attiva `SAVEQUERIES` dalla tab Costanti, poi in **Debug Manager → Query SQL** premi **"Registra le mie pagine per 30 minuti"** e visita una pagina del sito. Torna nella tab per vedere SQL eseguite, tempi e caller. Vengono registrate solo le tue pagine (non quelle degli altri visitatori, che contengono i loro dati), mai il login, REST e AJAX. Snapshot conservato 1 ora come transient.
 
 ### Tab Snapshots
 
@@ -72,10 +73,10 @@ Attiva `SAVEQUERIES` dalla tab Costanti, poi visita una pagina frontend. Torna i
 
 In aggiunta agli snapshot manuali, il plugin crea snapshot **automaticamente**:
 - Quando attivi l'Emergency Access (utile perché tipicamente lo attivi proprio prima di un intervento rischioso).
-- Quando WordPress completa un aggiornamento di plugin, tema o core.
+- Prima che WordPress aggiorni o installi plugin e temi, e dopo un aggiornamento del core.
 
 **Cosa ripristina e cosa no:**
-- ✅ Lista dei plugin attivi nel DB (`active_plugins`)
+- ✅ Plugin attivi (anche in rete, in multisite), con gli hook di attivazione e disattivazione
 - ✅ Tema attivo (`stylesheet`, `template`)
 - ❌ Non ripristina i **file** dei plugin/temi: se il bug è nella nuova versione del file, devi reinstallare la versione vecchia via FTP o via rollback manuale del plugin dalla sua interfaccia.
 - ❌ Non ripristina le option custom di configurazione
@@ -95,7 +96,7 @@ Gli snapshot mostrano il **diff** rispetto allo stato attuale (quale plugin è s
 1. Apri l'URL dell'emergency.
 2. Inserisci la password.
 3. Dalla dashboard:
-   - Ultimi 64KB di `debug.log` e PHP error log del server
+   - Ultimi 64KB di `debug.log` e le voci del PHP error log che riguardano il sito
    - Disattivare tutti i plugin (per isolare un fatal)
    - Disattivare un singolo plugin dall'elenco
    - Cambiare al tema default (cerca `twentytwentyfive` → `twentytwenty`)
@@ -103,21 +104,31 @@ Gli snapshot mostrano il **diff** rispetto allo stato attuale (quale plugin è s
    - Toggle costanti debug (es: attivare `WP_DEBUG_LOG` per vedere l'errore)
 
 **Sicurezza dell'emergency:**
-- Default **disattivato**. Finché non lo attivi esplicitamente, `emergency.php` risponde con errore anche con password giusta.
+- Default **disattivato**. Finché non lo attivi esplicitamente, `emergency.php` risponde "Accesso d'emergenza non disponibile" anche con la password giusta. Prima del login la pagina non dice mai il perché (disattivato, password, database, cartella): il motivo è scritto nel log degli errori di PHP del server.
 - 5 tentativi per IP (per rete /64 in IPv6), poi blocco di 15 minuti dall'ultimo tentativo. Ogni tentativo è contato prima della verifica della password, anche con richieste in parallelo; se il limite non può essere garantito (cartella privata non scrivibile) l'accesso è negato. L'IP è `REMOTE_ADDR` (non falsificabile); se il sito è dietro proxy/CDN, attiva l'opzione dedicata per usare l'ultimo hop di `X-Forwarded-For`.
 - Ogni tentativo (login, successo, blocco, azione) viene loggato con IP e User-Agent.
-- Sessione 30 minuti, cookie HttpOnly + SameSite=Strict, nuovo ID di sessione al login. Cambiare password, disattivare l'emergency o **disattivare il plugin** chiude tutte le sessioni aperte; disattivando il plugin l'emergency si spegne.
+- Sessione 30 minuti, cookie HttpOnly + SameSite=Strict (e `secure` anche dietro un proxy HTTPS), nuovo ID di sessione al login, logout solo dal pulsante (con token). Cambiare password, disattivare l'emergency o **disattivare il plugin** chiude tutte le sessioni aperte; disattivando il plugin l'emergency si spegne.
 - CSRF token su ogni azione distruttiva.
 - Ripristino degli snapshot validato: solo plugin ancora installati, solo temi il cui tema padre è presente.
 - File interni (log, rate-limit, snapshot, backup) in `wp-content/dbdm-private-{token}/`, fuori dalla cartella del plugin (sopravvive agli aggiornamenti), nome casuale e `.htaccess` deny-all: protetti anche su Nginx. Se la cartella manca, l'emergency nega l'accesso invece di ripiegare su un nome prevedibile.
 - Funziona anche con le credenziali del database in variabili d'ambiente (`getenv()`, `getenv_docker()` dell'immagine Docker ufficiale).
-- `<meta name="robots" content="noindex, nofollow">`.
+- Header `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `X-Robots-Tag: noindex`, `Cache-Control: no-store`, `Referrer-Policy: no-referrer`; log degli accessi con rotazione a 1 MB.
+- Con un'object cache persistente (Redis, Memcached) la dashboard avvisa che le modifiche possono restare in cache.
 
 **Quando il sito funziona bene, disattiva l'emergency.** È una feature da tenere spenta di default e accendere solo nei momenti di crisi.
+
+## Disinstallazione
+
+Eliminando il plugin dalla pagina Plugin vengono rimossi opzioni, transient (in multisite su ogni sito), impostazioni utente e la cartella privata (snapshot, backup di `wp-config.php`, log). Le costanti scritte in `wp-config.php` **restano**: la pagina Plugin e la tab Costanti le elencano, così puoi spegnerle prima.
+
+## Traduzioni
+
+Le stringhe del pannello sono traducibili (dominio `db-debug-manager`, catalogo `languages/db-debug-manager.pot`). `emergency.php` gira senza WordPress e resta in italiano.
 
 ## Note di sicurezza
 
 - Tutte le azioni admin protette da nonce + `manage_options` (`manage_network_options` in multisite).
+- Con `DISALLOW_FILE_MODS` il plugin non modifica `wp-config.php` (né dal pannello né dall'emergency).
 - `WP_DEBUG_DISPLAY` va tenuto **disattivato in produzione**.
 - `SAVEQUERIES` impatta le performance: solo in debug attivo.
 - Il backup di `wp-config.php` (`wp-content/dbdm-private-{token}/wp-config.dbdm-bak`) contiene lo stato precedente all'ultimo salvataggio; ne esiste sempre solo l'ultimo.
@@ -128,7 +139,8 @@ Gli snapshot mostrano il **diff** rispetto allo stato attuale (quale plugin è s
 ```
 db-debug-manager/
 ├── db-debug-manager.php         # Bootstrap singleton
-├── emergency.php                # Accesso standalone (no WP)
+├── emergency.php                # Accesso standalone (no WP): punto d'ingresso
+├── uninstall.php                # Pulizia alla disinstallazione
 ├── .htaccess                    # Protezione file sensibili
 ├── README.md
 ├── assets/
@@ -146,7 +158,12 @@ db-debug-manager/
 │   ├── class-queries.php
 │   ├── class-snapshots.php      # Preflight capture & rollback
 │   ├── class-standalone-config.php  # Lettura/scrittura wp-config (no WP deps)
-│   └── class-updater.php        # GitHub auto-updater
+│   ├── class-uninstall.php      # Disinstallazione
+│   ├── class-updater.php        # GitHub auto-updater
+│   └── emergency/               # Classi di emergency.php (no WP deps): richiesta,
+│                                # sessione, database, log, stato, azioni, pagine, flusso
+├── languages/
+│   └── db-debug-manager.pot
 ├── index.php                    # Anti directory-listing
 └── templates/
     ├── page.php
@@ -159,7 +176,9 @@ db-debug-manager/
 
 ## Changelog
 
-### Non rilasciata
+### 2.0.0 — Refactor dell'emergency, test completi e correzioni — 2026-10-06
+
+Seconda e ultima release del piano di test (`TESTING-PLAN.md`): `emergency.php` diviso in classi, unit, integration (anche multisite) ed E2E su ogni flusso, compreso il recupero di un sito rotto; tutti i difetti dell'audit corretti.
 
 - **Accessibilità (WCAG 2.1 AA, verificata con axe-core):** etichette per le costanti, la password e i filtri, nome al pulsante di eliminazione degli snapshot, contrasti corretti nel pannello e nell'emergency.
 - **Traduzioni:** dominio caricato da `languages/` (`Domain Path`), catalogo `languages/db-debug-manager.pot` (rigenerabile con `bin/make-pot.sh`), etichette degli snapshot traducibili. `emergency.php` gira senza WordPress e resta in italiano.

@@ -244,46 +244,46 @@ token usa INSERT IGNORE.
 Ogni flusso utente, nel browser e via HTTP diretto, su una matrice ampia.
 
 **Pannello admin** (`tools.php?page=db-debug-manager`):
-- [ ] Costanti: ogni costante on/off, effetto reale alla richiesta
+- [x] Costanti: ogni costante on/off, effetto reale alla richiesta
       successiva (notice visibile o no, `SAVEQUERIES` che cattura),
       `wp-config` non scrivibile, varianti del corpus, percorso personalizzato
       del log, su un sito pulito solo ciò che l'admin ha toccato (bug 8).
-- [ ] Log: viewer, righe, filtro, **aggiorna e auto-refresh con righe nuove**
+- [x] Log: viewer, righe, filtro, **aggiorna e auto-refresh con righe nuove**
       (43), UTF-8 non valido (44), file assente poi creato (57), download
       (nome, contenuto, header), svuota con conferma, log non pubblico (41).
-- [ ] Query: cattura dopo una visita, lente evidenziate, filtro.
-- [ ] Snapshots: crea con nota, diff dopo attivazioni e aggiornamenti
+- [x] Query: cattura dopo una visita, lente evidenziate, filtro.
+- [x] Snapshots: crea con nota, diff dopo attivazioni e aggiornamenti
       simulati, ripristino selettivo (plugin, tema, entrambi), plugin rimossi,
       tema padre mancante, elimina, elimina tutti, messaggi corretti (48).
-- [ ] Emergency (tab): password (lunghezza, conferma), abilita, rimuovi,
+- [x] Emergency (tab): password (lunghezza, conferma), abilita, rimuovi,
       proxy, svuota log, avviso Nginx.
 
 **`emergency.php` su HTTP, senza WordPress caricato**:
-- [ ] funziona su wp-env standard (`getenv_docker`, bug 10);
-- [ ] stati di errore: disattivato, senza password, DB irraggiungibile,
+- [x] funziona su wp-env standard (`getenv_docker`, bug 10);
+- [x] stati di errore: disattivato, senza password, DB irraggiungibile,
       `wp-config` illeggibile — senza rivelare dettagli (37);
-- [ ] login: password errata, CSRF scaduto, input come array (33),
+- [x] login: password errata, CSRF scaduto, input come array (33),
       **blocco dopo 5 tentativi anche con 20 richieste parallele** (11),
       proxy e header falsificati (16), sblocco allo scadere;
-- [ ] sessione: rigenerata al login (12), invalidata da cambio password,
+- [x] sessione: rigenerata al login (12), invalidata da cambio password,
       disattivazione emergency, disattivazione plugin (13, 14), scadenza,
       logout via POST (38), cookie e header (35);
-- [ ] **scenario "sito rotto"**: un plugin di prova manda in fatal tutto il
+- [x] **scenario "sito rotto"**: un plugin di prova manda in fatal tutto il
       sito; dall'emergency lo si individua nel log, lo si disattiva (singolo
       e tutti), il sito torna a rispondere; stesso con un tema rotto e
       "Cambia a tema default" (28); ripristino di uno snapshot (17);
-- [ ] toggle costanti dall'emergency con percorso del log conservato (20),
+- [x] toggle costanti dall'emergency con percorso del log conservato (20),
       log con UTF-8 non valido (19), slug con apostrofo (18), azioni senza
       effetto riportate come tali (30);
-- [ ] cartella privata mai raggiungibile via HTTP (15) e mai cancellata
+- [x] cartella privata mai raggiungibile via HTTP (15) e mai cancellata
       dagli aggiornamenti (39).
 
 **Trasversali**:
-- [ ] accessibilità axe-core WCAG 2.1 AA su tutte le tab e su
+- [x] accessibilità axe-core WCAG 2.1 AA su tutte le tab e su
       `emergency.php` (59);
-- [ ] multisite: amministratore di sito senza accesso (40), azioni
+- [x] multisite: amministratore di sito senza accesso (40), azioni
       dell'emergency sulla rete (26);
-- [ ] matrice: PHP 8.1 / 8.3 / 8.4, WordPress 6.0 (o minimo deciso) /
+- [x] matrice: PHP 8.1 / 8.3 / 8.4, WordPress 6.0 (o minimo deciso) /
       latest / trunk, single e multisite; nightly sulla matrice completa.
 
 ## 7. Decisioni (prese il 2026-10-06)
@@ -345,6 +345,15 @@ Tutti i bug di priorità A (1–4, 10–17, 39–42) più alcuni B/C collegati (
 Nuovo file: `inc/class-emergency-guard.php` (regole di sicurezza
 dell'emergency, senza WordPress). Il refactor completo di `emergency.php`
 resta nella 2.0.0.
+
+### Fasi 1–3 — fatte (→ 2.0.0)
+
+Fase 1 (PR #4), Fase 2 (PR #5), Fase 3 (PR #6). A fine piano: 205 unit,
+integration su WordPress 6.0, latest e multisite, 44 E2E a ogni PR (su
+`.wp-env.json` e su WordPress 6.0), matrice PHP × WordPress nella nightly.
+Il multisite non ha E2E (wp-env richiederebbe un ambiente a parte): è
+coperto dagli integration con `WP_MULTISITE=1` e, per l'emergency, dagli
+unit su SQLite.
 
 ### Ordine di lavoro
 
