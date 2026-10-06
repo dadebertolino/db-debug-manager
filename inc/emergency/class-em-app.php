@@ -16,8 +16,17 @@ class DBDM_Em_App {
     /** @var string Cartella del plugin, senza slash finale. */
     private $plugin_dir;
 
-    public function __construct($plugin_dir) {
+    /** @var callable function(array $creds): PDO|false */
+    private $connect;
+
+    /**
+     * @param string        $plugin_dir
+     * @param callable|null $connect    Connessione al database (nei test);
+     *                                  di default DBDM_Standalone_Config::connect().
+     */
+    public function __construct($plugin_dir, $connect = null) {
         $this->plugin_dir = rtrim($plugin_dir, '/');
+        $this->connect    = $connect ? $connect : array('DBDM_Standalone_Config', 'connect');
     }
 
     /**
@@ -73,8 +82,26 @@ class DBDM_Em_App {
 
     public function run(DBDM_Em_Request $request) {
         DBDM_Em_Session::start($request);
-        $session = new DBDM_Em_Session($_SESSION);
-        $view    = new DBDM_Em_View($session);
+        $this->dispatch($request, new DBDM_Em_Session($_SESSION));
+    }
+
+    /**
+     * Risponde a una richiesta con la sessione già avviata.
+     * 2.0.0 (bug 34): un errore del database (tipicamente $table_prefix che
+     * non corrisponde alle tabelle) dà una pagina d'errore invece di una
+     * risposta 500 vuota; il dettaglio va solo nel log degli errori di PHP.
+     */
+    public function dispatch(DBDM_Em_Request $request, DBDM_Em_Session $session) {
+        $view = new DBDM_Em_View($session);
+        try {
+            $this->handle($request, $session, $view);
+        } catch (PDOException $e) {
+            error_log('DB Debug Manager emergency: ' . $e->getMessage()); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- unico canale per i dettagli, fuori dalla pagina.
+            $view->error('Errore nella lettura del database. Controlla che $table_prefix in wp-config.php corrisponda alle tabelle del sito; il dettaglio è nel log degli errori di PHP.');
+        }
+    }
+
+    private function handle(DBDM_Em_Request $request, DBDM_Em_Session $session, DBDM_Em_View $view) {
 
         // Configurazione e database.
         $config_path = DBDM_Standalone_Config::find_wp_config($this->plugin_dir);
@@ -87,7 +114,7 @@ class DBDM_Em_App {
             $view->error('Impossibile leggere le credenziali da wp-config.php.');
             return;
         }
-        $pdo = DBDM_Standalone_Config::connect($creds);
+        $pdo = call_user_func($this->connect, $creds);
         if (!$pdo) {
             $view->error('Connessione al database fallita.');
             return;

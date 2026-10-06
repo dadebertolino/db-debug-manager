@@ -161,6 +161,7 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Fix (emergency): pagina bianca (errore 500) se il database risponde ma le tabelle non corrispondono** a `$table_prefix`. Ora una pagina spiega cosa controllare; il dettaglio tecnico va nel log degli errori di PHP.
 - **Fix (emergency): stato delle costanti di debug sbagliato** con `define( 'WP_DEBUG', 1 )`, valori da `getenv()`, `define` condizionali o copie commentate. Ora è letto come lo vede PHP; un valore non determinabile è indicato come "da verificare".
 - **Fix (emergency): azioni riportate come riuscite anche senza effetto.** Un plugin già disattivato, nessun transient, un log già vuoto ora danno un avviso giallo; un elenco dei plugin illeggibile, un'azione sconosciuta o un modulo scaduto (prima ignorato in silenzio) danno un errore. "Disattiva" funziona anche con nomi di plugin non UTF-8.
 - **Fix (emergency): "Cambia a tema default" poteva scegliere il tema rotto stesso o un child theme.** Ora esclude il tema attivo e il suo padre e sceglie solo temi completi.

@@ -285,6 +285,61 @@ class EmergencyCoreTest extends TestCase {
 		$this->assertSame( $fallback, DBDM_Em_App::site_paths( array( 'content_dir' => $this->dir . '/manca', 'themes_dir' => array(), 'plugins_dir' => 'relativo' ), $plugin ), 'cartelle inesistenti o non valide' );
 	}
 
+	/* --- Flusso: errori del database (bug 34) ------------------------------ */
+
+	/**
+	 * Installazione finta: wp-config.php e cartella del plugin.
+	 *
+	 * @return string Cartella del plugin.
+	 */
+	private function site() {
+		$plugin = $this->dir . '/wp/wp-content/plugins/db-debug-manager';
+		mkdir( $plugin, 0755, true );
+		copy( DBDM_TEST_ROOT . '/tests/fixtures/wp-config/standard.php', $this->dir . '/wp/wp-config.php' );
+		return $plugin;
+	}
+
+	private function dispatch( DBDM_Em_App $app ) {
+		$store = array();
+		return $this->render( function () use ( $app, &$store ) {
+			$app->dispatch( new DBDM_Em_Request( array(), array(), array( 'REQUEST_METHOD' => 'GET' ) ), new DBDM_Em_Session( $store ) );
+		} );
+	}
+
+	public function test_database_irraggiungibile(): void {
+		$app = new DBDM_Em_App( $this->site(), function () {
+			return false;
+		} );
+		$this->assertStringContainsString( 'Connessione al database fallita.', $this->dispatch( $app ) );
+	}
+
+	/**
+	 * Bug 34: con un prefisso delle tabelle sbagliato la PDOException non
+	 * era gestita: risposta 500 vuota.
+	 */
+	public function test_errore_del_database_pagina_senza_dettagli(): void {
+		if ( ! in_array( 'sqlite', PDO::getAvailableDrivers(), true ) ) {
+			$this->markTestSkipped( 'pdo_sqlite non disponibile' );
+		}
+		// Nessuna tabella: come un $table_prefix che non corrisponde.
+		$pdo = new PDO( 'sqlite::memory:', null, null, array( PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION ) );
+		$app = new DBDM_Em_App( $this->site(), function () use ( $pdo ) {
+			return $pdo;
+		} );
+
+		$previous = ini_set( 'error_log', $this->dir . '/php-errors.log' );
+		try {
+			$html = $this->dispatch( $app );
+		} finally {
+			ini_set( 'error_log', $previous );
+		}
+
+		$this->assertStringContainsString( 'Accesso non disponibile', $html );
+		$this->assertStringContainsString( 'Errore nella lettura del database', $html );
+		$this->assertStringNotContainsString( 'no such table', $html, 'dettagli solo nel log' );
+		$this->assertStringContainsString( 'no such table', file_get_contents( $this->dir . '/php-errors.log' ) );
+	}
+
 	/* --- Pagine -------------------------------------------------------------- */
 
 	private function render( callable $fn ) {
