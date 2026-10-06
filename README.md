@@ -3,7 +3,7 @@
 Plugin WordPress per gestire il debug direttamente dal pannello di amministrazione, senza più aprire l'FTP per modificare `wp-config.php` o scaricare `debug.log`. Include un **sistema di accesso emergency standalone** che funziona anche quando WordPress è crashato.
 
 **Autore:** Davide Bertolino · [davidebertolino.it](https://www.davidebertolino.it)
-**Versione:** 1.3.2
+**Versione:** 1.4.0
 **Licenza:** GPL v2 or later
 
 ---
@@ -14,8 +14,9 @@ Plugin WordPress per gestire il debug direttamente dal pannello di amministrazio
 - **Toggle delle costanti** (`WP_DEBUG`, `WP_DEBUG_LOG`, `WP_DEBUG_DISPLAY`, `SCRIPT_DEBUG`, `SAVEQUERIES`) con salvataggio diretto in `wp-config.php`.
 - **Viewer del `debug.log`** in tempo reale, con filtro, auto-refresh ogni 5 secondi, download e svuotamento.
 - **Query Monitor**: snapshot delle query SQL eseguite sull'ultima pagina frontend. Evidenzia le query lente (>50ms) e mostra il caller stack.
-- **Backup automatico** di `wp-config.php` prima di ogni modifica (nella cartella privata randomizzata, deny-all).
-- **Validazione sintattica PHP** pre-salvataggio (aborta se la modifica genererebbe parse error).
+- **Backup automatico** di `wp-config.php` prima di ogni modifica (nella cartella privata randomizzata, deny-all): se il backup non riesce, `wp-config.php` non viene toccato.
+- **Scrittura sicura** di `wp-config.php`: lettura con il tokenizer di PHP (commenti, `define` condizionali e valori da `getenv()` riconosciuti), scrittura atomica, controllo di sintassi prima di salvare.
+- **Debug log privato**: attivando `WP_DEBUG_LOG` dal pannello il log va nella cartella privata, non in `/wp-content/debug.log` raggiungibile da chiunque.
 
 ### Emergency Access (v1.1.0)
 - File **standalone** (`emergency.php`) che **non carica WordPress**: funziona anche quando il sito è crashato.
@@ -47,10 +48,12 @@ Plugin WordPress per gestire il debug direttamente dal pannello di amministrazio
 ## Utilizzo
 
 ### Tab Costanti
-Spunta/deseleziona le costanti e premi **Salva**. Le modifiche hanno effetto al caricamento successivo di qualsiasi pagina. Se `wp-config.php` non è scrivibile, i toggle sono disabilitati e compare un alert con il percorso rilevato.
+Spunta/deseleziona le costanti e premi **Salva**. Le modifiche hanno effetto al caricamento successivo di qualsiasi pagina. Vengono scritte solo le costanti che cambiano; una `define` già presente viene modificata dov'è (commenti e condizioni restano com'erano). Se `wp-config.php` non è scrivibile, i toggle sono disabilitati e compare un alert con il percorso rilevato.
+
+In multisite il pannello è nella **bacheca di rete** (Impostazioni → Debug Manager) ed è riservato ai super admin: `wp-config.php` e il log sono dell'intera rete.
 
 ### Tab Debug Log
-La prima volta che viene generato un errore con `WP_DEBUG_LOG` attiva, il file `/wp-content/debug.log` viene creato automaticamente da WordPress.
+La prima volta che viene generato un errore con `WP_DEBUG_LOG` attiva, WordPress crea il file di log. Attivato dal pannello, il log sta nella cartella privata (`wp-content/dbdm-private-{token}/debug.log`); un percorso personalizzato già impostato in `wp-config.php` viene rispettato.
 - Seleziona numero di righe (100–5000).
 - Usa il campo **Filtra** per trovare righe specifiche (`Fatal`, `Notice`, nome file).
 - **Auto-refresh 5s** per monitoraggio live.
@@ -101,21 +104,23 @@ Gli snapshot mostrano il **diff** rispetto allo stato attuale (quale plugin è s
 
 **Sicurezza dell'emergency:**
 - Default **disattivato**. Finché non lo attivi esplicitamente, `emergency.php` risponde con errore anche con password giusta.
-- Dopo 5 tentativi falliti, IP bloccato per 15 minuti. L'IP è `REMOTE_ADDR` (non falsificabile); se il sito è dietro proxy/CDN, attiva l'opzione dedicata per usare gli header del proxy.
+- 5 tentativi per IP (per rete /64 in IPv6), poi blocco di 15 minuti dall'ultimo tentativo. Ogni tentativo è contato prima della verifica della password, anche con richieste in parallelo; se il limite non può essere garantito (cartella privata non scrivibile) l'accesso è negato. L'IP è `REMOTE_ADDR` (non falsificabile); se il sito è dietro proxy/CDN, attiva l'opzione dedicata per usare l'ultimo hop di `X-Forwarded-For`.
 - Ogni tentativo (login, successo, blocco, azione) viene loggato con IP e User-Agent.
-- Sessione 30 minuti, cookie HttpOnly + SameSite=Strict.
+- Sessione 30 minuti, cookie HttpOnly + SameSite=Strict, nuovo ID di sessione al login. Cambiare password, disattivare l'emergency o **disattivare il plugin** chiude tutte le sessioni aperte; disattivando il plugin l'emergency si spegne.
 - CSRF token su ogni azione distruttiva.
-- File interni (log, rate-limit, snapshot, backup) in una cartella a nome casuale `private-{token}` con `.htaccess` deny-all: protetti anche su Nginx.
+- Ripristino degli snapshot validato: solo plugin ancora installati, solo temi il cui tema padre è presente.
+- File interni (log, rate-limit, snapshot, backup) in `wp-content/dbdm-private-{token}/`, fuori dalla cartella del plugin (sopravvive agli aggiornamenti), nome casuale e `.htaccess` deny-all: protetti anche su Nginx. Se la cartella manca, l'emergency nega l'accesso invece di ripiegare su un nome prevedibile.
+- Funziona anche con le credenziali del database in variabili d'ambiente (`getenv()`, `getenv_docker()` dell'immagine Docker ufficiale).
 - `<meta name="robots" content="noindex, nofollow">`.
 
 **Quando il sito funziona bene, disattiva l'emergency.** È una feature da tenere spenta di default e accendere solo nei momenti di crisi.
 
 ## Note di sicurezza
 
-- Tutte le azioni admin protette da nonce + `manage_options`.
+- Tutte le azioni admin protette da nonce + `manage_options` (`manage_network_options` in multisite).
 - `WP_DEBUG_DISPLAY` va tenuto **disattivato in produzione**.
 - `SAVEQUERIES` impatta le performance: solo in debug attivo.
-- Il backup di `wp-config.php` (`private-{token}/wp-config.dbdm-bak`) viene sovrascritto a ogni modifica; ne esiste sempre solo l'ultimo.
+- Il backup di `wp-config.php` (`wp-content/dbdm-private-{token}/wp-config.dbdm-bak`) contiene lo stato precedente all'ultimo salvataggio; ne esiste sempre solo l'ultimo.
 - L'emergency access è **ad alto rischio**: chiunque ottenga la password ha accesso a operazioni distruttive. Trattala come chiave master.
 
 ## Struttura file
@@ -135,16 +140,14 @@ db-debug-manager/
 ├── inc/
 │   ├── class-admin.php
 │   ├── class-config.php         # Parser wp-config (WP side)
-│   ├── class-emergency.php      # Password/log emergency (WP side)
+│   ├── class-emergency.php      # Password/log emergency, cartella privata (WP side)
+│   ├── class-emergency-guard.php    # Regole di sicurezza dell'emergency (no WP deps)
 │   ├── class-log.php
 │   ├── class-queries.php
 │   ├── class-snapshots.php      # Preflight capture & rollback
-│   ├── class-standalone-config.php  # Parser wp-config (no WP deps)
+│   ├── class-standalone-config.php  # Lettura/scrittura wp-config (no WP deps)
 │   └── class-updater.php        # GitHub auto-updater
 ├── index.php                    # Anti directory-listing
-├── private-{token}/             # Auto-creata (nome casuale), log + snapshot + backup
-│   ├── .htaccess                # Deny all
-│   └── index.php
 └── templates/
     ├── page.php
     ├── tab-config.php
@@ -156,7 +159,25 @@ db-debug-manager/
 
 ## Changelog
 
-### Non rilasciata
+### 1.4.0 — Sicurezza dell'emergency e di wp-config.php — 2026-10-06
+
+Prima release del piano di test (`TESTING-PLAN.md`): corregge tutti i difetti di priorità A trovati dall'audit, ciascuno con un test automatico.
+
+- **Fix (importante): ogni aggiornamento del plugin cancellava snapshot, backup di `wp-config.php` e log dell'emergency.** La cartella privata stava dentro la cartella del plugin; ora è `wp-content/dbdm-private-{token}/`, con migrazione automatica.
+- **Fix: emergency inutilizzabile con le credenziali in variabili d'ambiente** (Docker, molti hosting gestiti): `getenv()` e `getenv_docker()` vengono ora risolti. Supportati anche `DB_HOST` con socket o IPv6 e `wp-config.php` un livello sopra WordPress.
+- **Fix: scrittura di `wp-config.php`.** Una `define` dopo un `/*` aperto veniva "decommentata" (parse error); una `define` con commento in coda, condizionale o su più righe veniva duplicata invece che modificata (il toggle non aveva effetto e PHP avvisava "already defined" a ogni richiesta). Ora la lettura usa il tokenizer di PHP, la scrittura è atomica, il backup contiene lo stato prima del salvataggio e se non riesce non si scrive nulla, il controllo di sintassi non dipende più da `exec`. Dopo la scrittura la cache di OPcache viene invalidata (prima le richieste dei secondi successivi potevano usare il file precedente).
+- **Sicurezza emergency:**
+  - limite dei tentativi aggirabile con richieste parallele, e disattivato in silenzio se la cartella non era scrivibile: ora ogni tentativo è prenotato sotto lock prima della verifica e, senza limite garantito, l'accesso è negato;
+  - nessuna rigenerazione dell'ID di sessione al login (session fixation): ora nuovo ID e modalità stretta;
+  - le sessioni sopravvivevano a cambio password, disattivazione dell'emergency e del plugin: ora vengono chiuse;
+  - disattivare il plugin lasciava l'emergency attivo: ora lo spegne;
+  - con "proxy fidato" `CF-Connecting-IP` era accettato anche senza Cloudflare (tentativi illimitati cambiando header): ora si usa solo l'ultimo hop di `X-Forwarded-For`; IPv6 limitato per rete /64;
+  - senza cartella privata si ripiegava su `private/`, dal nome prevedibile e scaricabile su Nginx: ora l'accesso è negato;
+  - ripristino degli snapshot senza validazione: percorsi non validi e temi figlio senza padre (sito bianco) vengono ora scartati; valori serializzati letti senza istanziare oggetti.
+- **Fix: multisite.** Ogni amministratore di sito poteva riscrivere il `wp-config.php` della rete e leggere il log di tutti i siti: ora il pannello è nella bacheca di rete, solo per i super admin.
+- **Fix: debug log pubblico.** Attivare `WP_DEBUG_LOG` dal pannello lo scriveva in `/wp-content/debug.log`, raggiungibile da chiunque: ora va nella cartella privata, e un log pubblico già attivo viene spostato al primo salvataggio. Anche l'emergency mostra e svuota il log nella posizione effettiva.
+- **Fix: un nome di plugin con caratteri non UTF-8 cancellava tutti gli snapshot.** Ripristino del tema con `switch_theme()` (tema padre verificato, autoload delle opzioni invariato).
+- Il pannello scrive solo le costanti che cambiano (prima riscriveva anche `WP_DEBUG_DISPLAY`, attiva di default).
 - **Requisito minimo WordPress 6.0** (era 5.8), allineato agli altri plugin DB. WordPress stesso impedisce l'attivazione sulle versioni precedenti.
 - **Suite di test:** unit (PHP 7.4–8.4), integration (WordPress 6.0 e ultima versione, anche multisite) ed E2E (wp-env + Playwright, compreso l'accesso a `emergency.php`), più una run notturna su WordPress in sviluppo e PHP 8.4. Vedi `TESTING.md`.
 - **Aggiornamenti dal pannello:** `DB_GitHub_Updater` 1.1.0, lo stesso di DB Privacy Hub 1.8.0. Dopo un aggiornamento il plugin viene riattivato solo se era attivo (prima veniva attivato anche se l'admin l'aveva disattivato), anche per l'attivazione di rete; release senza ZIP ignorate invece di generare un errore; nessun errore se il filesystem di WordPress non è disponibile.
