@@ -161,6 +161,7 @@ db-debug-manager/
 
 ### Non rilasciata
 
+- **Traduzioni:** dominio caricato da `languages/` (`Domain Path`), catalogo `languages/db-debug-manager.pot` (rigenerabile con `bin/make-pot.sh`), etichette degli snapshot traducibili. `emergency.php` gira senza WordPress e resta in italiano.
 - **Fix: "Aggiorna" e l'auto-refresh del log mostravano sempre il contenuto di quando la pagina era stata caricata.** Ora mostrano le righe nuove, anche con un filtro attivo; il viewer c'è anche se il log nasce dopo, e una sessione scaduta viene segnalata.
 - **Fix: un byte non UTF-8 rendeva vuoti il viewer del log e la tab Query.**
 - **Fix: messaggi del pannello.** "Snapshot eliminato", "Ripristino completato" e simili comparivano anche in caso di errore, e un link con `?err=` poteva far mostrare un testo qualsiasi. Ora gli avvisi riflettono l'esito reale e non vengono più dalla query string.

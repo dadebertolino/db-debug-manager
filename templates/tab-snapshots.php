@@ -9,10 +9,10 @@ $snapshots = DBDM_Snapshots::get_all();
 $snapshots = array_reverse($snapshots);
 
 $trigger_labels = array(
-    DBDM_Snapshots::TRIGGER_MANUAL    => array('Manuale', 'primary'),
-    DBDM_Snapshots::TRIGGER_EMERGENCY => array('Emergency attivato', 'warning'),
-    DBDM_Snapshots::TRIGGER_PRE_UPGRADE => array('Pre-aggiornamento', 'success'),
-    DBDM_Snapshots::TRIGGER_UPGRADE   => array('Post-aggiornamento', 'success'),
+    DBDM_Snapshots::TRIGGER_MANUAL    => array(__('Manuale', 'db-debug-manager'), 'primary'),
+    DBDM_Snapshots::TRIGGER_EMERGENCY => array(__('Emergency attivato', 'db-debug-manager'), 'warning'),
+    DBDM_Snapshots::TRIGGER_PRE_UPGRADE => array(__('Pre-aggiornamento', 'db-debug-manager'), 'success'),
+    DBDM_Snapshots::TRIGGER_UPGRADE   => array(__('Post-aggiornamento', 'db-debug-manager'), 'success'),
 );
 
 ?>
@@ -39,7 +39,7 @@ $trigger_labels = array(
             </p>
             <button type="submit" class="db-ui-btn db-ui-btn-primary">📸 <?php esc_html_e('Crea snapshot adesso', 'db-debug-manager'); ?></button>
             <span class="db-ui-text-muted" style="margin-left:12px; font-size:12px;">
-                <?php printf(esc_html__('Si conservano gli ultimi %d snapshot manuali e gli ultimi %d automatici.', 'db-debug-manager'), absint(DBDM_Snapshots::MAX_SNAPSHOTS), absint(DBDM_Snapshots::MAX_SNAPSHOTS)); ?>
+                <?php printf(esc_html__('Si conservano gli ultimi %d snapshot manuali e altrettanti automatici.', 'db-debug-manager'), absint(DBDM_Snapshots::MAX_SNAPSHOTS)); ?>
             </span>
         </form>
     </div>

@@ -8,6 +8,7 @@
  * Author URI: https://www.davidebertolino.it
  * License: GPL v2 or later
  * Text Domain: db-debug-manager
+ * Domain Path: /languages
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Update URI: https://github.com/dadebertolino/db-debug-manager
@@ -63,6 +64,11 @@ final class DB_Debug_Manager {
 }
 
 DB_Debug_Manager::instance();
+
+// 2.0.0 (bug 58): traduzioni da languages/ (il plugin non è su wordpress.org).
+add_action('init', function () {
+    load_plugin_textdomain('db-debug-manager', false, dirname(plugin_basename(__FILE__)) . '/languages');
+});
 
 // 1.4.0: disattivando il plugin l'accesso emergency si spegne.
 register_deactivation_hook(__FILE__, array('DBDM_Emergency', 'on_plugin_deactivate'));

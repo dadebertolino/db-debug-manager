@@ -187,4 +187,17 @@ class ConfigAndLogTest extends TestCase {
 		$this->assertSame( "uno\ndue \u{FFFD}", DBDM_Log::tail( 10 ) );
 		unlink( $log );
 	}
+
+	/* --- Bug 58: traduzioni -------------------------------------------------- */
+
+	public function test_dominio_e_catalogo_delle_traduzioni(): void {
+		$header = file_get_contents( DBDM_PLUGIN_FILE, false, null, 0, 2048 );
+		$this->assertMatchesRegularExpression( '/^\s*\*\s*Domain Path:\s*\/languages\s*$/m', $header );
+		$this->assertMatchesRegularExpression( "/load_plugin_textdomain\\(\\s*'db-debug-manager'/", file_get_contents( DBDM_PLUGIN_FILE ) );
+
+		$pot = DBDM_TEST_ROOT . '/languages/db-debug-manager.pot';
+		$this->assertFileExists( $pot );
+		$this->assertStringContainsString( 'msgid "Snapshot creato."', file_get_contents( $pot ) );
+		$this->assertStringContainsString( 'msgid "Pre-aggiornamento"', file_get_contents( $pot ), 'etichette degli snapshot traducibili' );
+	}
 }

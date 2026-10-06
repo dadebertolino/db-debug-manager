@@ -111,7 +111,7 @@ $const_descriptions = array(
                 <button type="submit" class="db-ui-btn db-ui-btn-primary" <?php disabled(!$writable); ?>>
                     <?php esc_html_e('Salva modifiche', 'db-debug-manager'); ?>
                 </button>
-                <span class="db-ui-text-muted"><?php esc_html_e('Le modifiche hanno effetto al prossimo caricamento pagina (backup automatico di wp-config.php nella cartella privata del plugin).', 'db-debug-manager'); ?></span>
+                <span class="db-ui-text-muted"><?php esc_html_e('Le modifiche hanno effetto al prossimo caricamento pagina. Prima di ogni salvataggio wp-config.php viene copiato nella cartella privata (wp-content/dbdm-private-…).', 'db-debug-manager'); ?></span>
             </div>
             <?php $dbdm_left = DBDM_Uninstall::leftover_constants($config_path); ?>
             <?php if ($dbdm_left): ?>
