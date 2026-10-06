@@ -70,7 +70,7 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 15 ✅ | A | `emergency.php:51,239` | Senza token valido si ricade su `private/` prevedibile, dove finisce il backup di `wp-config.php` (credenziali DB): scaricabile su Nginx. Accade dopo un aggiornamento via FTP prima di aprire il pannello | E |
 | 16 ✅ | A | `emergency.php:91` | Con "fidati del proxy" attivo `CF-Connecting-IP` è accettato anche senza Cloudflare: tentativi infiniti cambiando header; IPv6 per indirizzo esatto | U + E |
 | 17 ✅ | A | `emergency.php:417-442` | Ripristino snapshot senza validazione: percorsi `../`, cartelle, non-stringhe; il tema padre (`template`) non viene verificato → sito bianco | I + E |
-| 18 | B | `emergency.php:807` | Iniezione JS nel `confirm()` del pulsante "Disattiva" (slug con apostrofo) | E |
+| 18 ✅ | B | `emergency.php:807` | Iniezione JS nel `confirm()` del pulsante "Disattiva" (slug con apostrofo) | E |
 | 19 | B | `emergency.php:826,840` | Pannelli del log vuoti con UTF-8 non valido (taglio a metà carattere, Latin-1) | E |
 | 20 | B | `emergency.php:363` | Il toggle `WP_DEBUG_LOG` dall'emergency perde il percorso personalizzato (il pannello lo conserva) | E |
 | 21 | B | `emergency.php:379,475,327` | Percorsi fissi: `wp-content/debug.log`, cartella temi; ignorati `WP_DEBUG_LOG` stringa e `WP_CONTENT_DIR` | U/E |

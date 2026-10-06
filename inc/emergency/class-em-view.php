@@ -219,7 +219,7 @@ class DBDM_Em_View {
                         <tr>
                             <td><code><?php echo htmlspecialchars($p, ENT_QUOTES); ?></code></td>
                             <td style="text-align:right;">
-                                <form method="post" style="display:inline;" onsubmit="return confirm('Disattivare <?php echo htmlspecialchars($p, ENT_QUOTES); ?>?');">
+                                <form method="post" style="display:inline;" onsubmit="return confirm(<?php echo $this->js_string('Disattivare ' . $p . '?'); ?>);">
                                     <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES); ?>">
                                     <input type="hidden" name="a" value="disable_plugin">
                                     <input type="hidden" name="plugin" value="<?php echo htmlspecialchars($p, ENT_QUOTES); ?>">
@@ -258,6 +258,19 @@ class DBDM_Em_View {
 </div>
 <?php
         $this->footer();
+    }
+
+    /**
+     * Stringa JS da inserire in un attributo HTML (onsubmit): JSON per il
+     * JS, poi entità per l'attributo. Il browser decodifica le entità prima
+     * di eseguire il codice, quindi un escape solo HTML non basta (bug 18).
+     */
+    private function js_string($text) {
+        $json = json_encode(
+            (string) $text,
+            JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+        );
+        return htmlspecialchars($json, ENT_QUOTES);
     }
 
     private function header($title) {

@@ -268,4 +268,36 @@ class EmergencyCoreTest extends TestCase {
 		$this->assertStringContainsString( '2.0 KB', $html );
 		$this->assertSame( 2 + 4 + 2 + 1, substr_count( $html, 'name="csrf" value="' . $store['dbdm_csrf'] . '"' ), 'un token per ogni modulo' );
 	}
+
+	/**
+	 * Bug 18: lo slug finiva in una stringa JS tra apici dentro onsubmit;
+	 * l'entità &#039; viene decodificata dal browser prima di eseguire il JS,
+	 * quindi un apostrofo chiudeva la stringa.
+	 */
+	public function test_slug_con_apostrofo_nel_confirm(): void {
+		$store = array();
+		$view  = new DBDM_Em_View( new DBDM_Em_Session( $store ) );
+		$slug  = "o'x/x.php\");alert(1);//<\xff";
+		$html  = $this->render( function () use ( $view, $slug ) {
+			$view->dashboard(
+				array(),
+				array(
+					'log_content'     => '',
+					'log_size'        => 0,
+					'active_plugins'  => array( $slug ),
+					'cur_theme'       => 'tt',
+					'consts_status'   => array(),
+					'php_error_log'   => '',
+					'php_log_content' => '',
+					'snapshots'       => array(),
+				)
+			);
+		} );
+
+		$this->assertSame( 1, preg_match( '/<form[^>]*onsubmit="([^"]*)"[^>]*>\s*<input[^>]*>\s*<input[^>]*value="disable_plugin"/', $html, $m ) );
+		// Il JS che il browser esegue: l'attributo con le entità decodificate.
+		$js = html_entity_decode( $m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$this->assertSame( 1, preg_match( '/^return confirm\((.*)\);$/s', $js, $arg ), $js );
+		$this->assertSame( "Disattivare o'x/x.php\");alert(1);//<\u{FFFD}?", json_decode( $arg[1] ), 'un solo argomento stringa, col testo intero' );
+	}
 }
