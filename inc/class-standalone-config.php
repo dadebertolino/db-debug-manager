@@ -322,9 +322,22 @@ class DBDM_Standalone_Config {
         clearstatcache(true, $config_path);
         if (file_get_contents($config_path) !== $new) {
             self::write_file($config_path, $content);
+            self::invalidate_opcache($config_path);
             return 'Verifica di wp-config.php non riuscita: ripristinato il contenuto precedente.';
         }
+        self::invalidate_opcache($config_path);
         return true;
+    }
+
+    /**
+     * Toglie un file dalla cache di OPcache (1.4.0): senza, le richieste dei
+     * secondi successivi alla scrittura continuano a usare la versione
+     * compilata precedente di wp-config.php (opcache.revalidate_freq).
+     */
+    public static function invalidate_opcache($path) {
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($path, true);
+        }
     }
 
     /**

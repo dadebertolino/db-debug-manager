@@ -50,7 +50,7 @@ test.describe( 'credenziali e cartella privata', () => {
 		// Come dopo un aggiornamento via FTP: password e abilitazione nel DB,
 		// cartella privata mai creata.
 		await resetState( request );
-		await request.post( '/?rest_route=/dbdm-e2e/v1/emergency-password', { data: { password: EMERGENCY_PASSWORD, enabled: true } } );
+		await request.post( '/?rest_route=/dbdm-e2e/v1/emergency-password', { data: { password: EMERGENCY_PASSWORD, enabled: true, drop_private: true } } );
 
 		const res = await request.get( EMERGENCY_URL );
 
@@ -215,7 +215,8 @@ test.describe( 'pannello: cartella privata', () => {
 
 		const em = await ( await browser.newContext() ).newPage();
 		await emergencyLogin( em );
-		await expect( em.getByRole( 'heading', { name: /Snapshot disponibili \(1\)/ } ) ).toBeVisible();
+		// Due: quello automatico "pre-emergency" (abilitazione) e quello manuale.
+		await expect( em.getByRole( 'heading', { name: /Snapshot disponibili \(2\)/ } ) ).toBeVisible();
 		await expect( em.getByText( 'prima di un aggiornamento' ) ).toBeVisible();
 	} );
 } );

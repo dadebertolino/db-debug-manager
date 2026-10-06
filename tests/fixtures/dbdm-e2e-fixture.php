@@ -198,6 +198,9 @@ function dbdm_e2e_reset( $args = array() ) {
 	if ( false === file_put_contents( $paths['config'], $config ) ) {
 		return new WP_Error( 'dbdm_e2e_config', 'wp-config.php non scrivibile dal server web.', array( 'status' => 500 ) );
 	}
+	if ( function_exists( 'opcache_invalidate' ) ) {
+		opcache_invalidate( $paths['config'], true );
+	}
 
 	// Opzioni e transient del plugin (anche quelli dell'updater).
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery
@@ -359,6 +362,14 @@ add_action(
 					$result = DBDM_Emergency::set_password( (string) $request->get_param( 'password' ) );
 					if ( null !== $request->get_param( 'enabled' ) ) {
 						DBDM_Emergency::set_enabled( (bool) $request->get_param( 'enabled' ) );
+					}
+					// Come dopo un aggiornamento via FTP: cartella privata mai creata.
+					if ( $request->get_param( 'drop_private' ) ) {
+						foreach ( dbdm_e2e_private_dirs() as $dir ) {
+							dbdm_e2e_rmdir( $dir );
+						}
+						delete_option( 'dbdm_private_dir_path' );
+						delete_option( 'dbdm_private_dir_token' );
 					}
 					return rest_ensure_response( $result );
 				},

@@ -68,6 +68,11 @@ class PhaseAIntegrationTest extends WP_UnitTestCase {
 		if ( ! is_multisite() ) {
 			$this->markTestSkipped( 'Richiede WP_MULTISITE=1.' );
 		}
+		// Singleton nuovo: gli hook di un'istanza precedente sono stati
+		// rimossi dal ripristino degli hook tra un test e l'altro.
+		$ref = new ReflectionProperty( 'DBDM_Admin', 'instance' );
+		$ref->setAccessible( true );
+		$ref->setValue( null, null );
 		DBDM_Admin::instance();
 		$this->assertNotFalse( has_action( 'network_admin_menu', array( DBDM_Admin::instance(), 'register_menu' ) ) );
 		$this->assertFalse( has_action( 'admin_menu', array( DBDM_Admin::instance(), 'register_menu' ) ) );

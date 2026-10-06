@@ -36,7 +36,8 @@ test( 'wp-config.php da hosting: commenti e condizioni rispettati (bug 1, 4)', a
 	await saveConstants( page, [ 'WP_DEBUG', 'SCRIPT_DEBUG' ] );
 
 	const state = await getState( request );
-	expect( state.constants ).toMatchObject( { WP_DEBUG: true, SCRIPT_DEBUG: true, SAVEQUERIES: false } );
+	// SAVEQUERIES non è nel wp-config.php di wp-env: resta non definita.
+	expect( state.constants ).toMatchObject( { WP_DEBUG: true, SCRIPT_DEBUG: true, SAVEQUERIES: null } );
 	expect( state.wp_config ).toContain( "define( 'WP_DEBUG', true ); // impostato dall'hosting" );
 	expect( state.wp_config ).toContain( "defined( 'SCRIPT_DEBUG' ) || define( 'SCRIPT_DEBUG', true );" );
 	// Il blocco commentato non è stato toccato né duplicato.
