@@ -9,27 +9,13 @@ $snapshots = DBDM_Snapshots::get_all();
 $snapshots = array_reverse($snapshots);
 
 $trigger_labels = array(
-    DBDM_Snapshots::TRIGGER_MANUAL    => array('Manuale', 'primary'),
-    DBDM_Snapshots::TRIGGER_EMERGENCY => array('Emergency attivato', 'warning'),
-    DBDM_Snapshots::TRIGGER_PRE_UPGRADE => array('Pre-aggiornamento', 'success'),
-    DBDM_Snapshots::TRIGGER_UPGRADE   => array('Post-aggiornamento', 'success'),
+    DBDM_Snapshots::TRIGGER_MANUAL    => array(__('Manuale', 'db-debug-manager'), 'primary'),
+    DBDM_Snapshots::TRIGGER_EMERGENCY => array(__('Emergency attivato', 'db-debug-manager'), 'warning'),
+    DBDM_Snapshots::TRIGGER_PRE_UPGRADE => array(__('Pre-aggiornamento', 'db-debug-manager'), 'success'),
+    DBDM_Snapshots::TRIGGER_UPGRADE   => array(__('Post-aggiornamento', 'db-debug-manager'), 'success'),
 );
 
-// Messaggi di ripristino da transient.
-$restore_msgs = get_transient('dbdm_restore_msgs_' . get_current_user_id());
-if ($restore_msgs) {
-    delete_transient('dbdm_restore_msgs_' . get_current_user_id());
-}
 ?>
-
-<?php if (!empty($restore_msgs)): ?>
-    <?php foreach ($restore_msgs as $msg): ?>
-        <div class="db-ui-alert db-ui-alert-<?php echo $msg[0] === 'ok' ? 'success' : ($msg[0] === 'warn' ? 'warning' : 'danger'); ?>">
-            <span class="db-ui-alert-icon"><?php echo $msg[0] === 'ok' ? '✅' : ($msg[0] === 'warn' ? '⚠️' : '❌'); ?></span>
-            <span><?php echo esc_html($msg[1]); ?></span>
-        </div>
-    <?php endforeach; ?>
-<?php endif; ?>
 
 <div class="db-ui-alert db-ui-alert-info">
     <span class="db-ui-alert-icon">📸</span>
@@ -53,7 +39,7 @@ if ($restore_msgs) {
             </p>
             <button type="submit" class="db-ui-btn db-ui-btn-primary">📸 <?php esc_html_e('Crea snapshot adesso', 'db-debug-manager'); ?></button>
             <span class="db-ui-text-muted" style="margin-left:12px; font-size:12px;">
-                <?php printf(esc_html__('Massimo %d snapshot, FIFO.', 'db-debug-manager'), absint(DBDM_Snapshots::MAX_SNAPSHOTS)); ?>
+                <?php printf(esc_html__('Si conservano gli ultimi %d snapshot manuali e altrettanti automatici.', 'db-debug-manager'), absint(DBDM_Snapshots::MAX_SNAPSHOTS)); ?>
             </span>
         </form>
     </div>
@@ -206,7 +192,7 @@ return ($d && $d !== '.') ? $d : $p;
                                 <input type="hidden" name="action" value="dbdm_delete_snapshot">
                                 <input type="hidden" name="id" value="<?php echo esc_attr($snap['id']); ?>">
                                 <?php wp_nonce_field('dbdm_delete_snapshot'); ?>
-                                <button type="submit" class="db-ui-btn db-ui-btn-sm">🗑</button>
+                                <button type="submit" class="db-ui-btn db-ui-btn-sm" aria-label="<?php esc_attr_e('Elimina snapshot', 'db-debug-manager'); ?>" title="<?php esc_attr_e('Elimina snapshot', 'db-debug-manager'); ?>"><span aria-hidden="true">🗑</span></button>
                             </form>
                         </div>
                     </div>

@@ -77,12 +77,13 @@ $const_descriptions = array(
                     <tr>
                         <td>
                             <input type="checkbox"
+                                id="dbdm-const-<?php echo esc_attr($const); ?>"
                                 name="dbdm[<?php echo esc_attr($const); ?>]"
                                 value="1"
                                 <?php checked($is_on); ?>
                                 <?php disabled(!$writable); ?>>
                         </td>
-                        <td><code><?php echo esc_html($const); ?></code></td>
+                        <td><label for="dbdm-const-<?php echo esc_attr($const); ?>"><code><?php echo esc_html($const); ?></code></label></td>
                         <td>
                             <?php if ($is_custom_path): ?>
                                 <span class="db-ui-badge db-ui-badge-success"><?php esc_html_e('Attiva', 'db-debug-manager'); ?></span>
@@ -110,7 +111,7 @@ $const_descriptions = array(
                 <button type="submit" class="db-ui-btn db-ui-btn-primary" <?php disabled(!$writable); ?>>
                     <?php esc_html_e('Salva modifiche', 'db-debug-manager'); ?>
                 </button>
-                <span class="db-ui-text-muted"><?php esc_html_e('Le modifiche hanno effetto al prossimo caricamento pagina (backup automatico di wp-config.php nella cartella privata del plugin).', 'db-debug-manager'); ?></span>
+                <span class="db-ui-text-muted"><?php esc_html_e('Le modifiche hanno effetto al prossimo caricamento pagina. Prima di ogni salvataggio wp-config.php viene copiato nella cartella privata (wp-content/dbdm-private-…).', 'db-debug-manager'); ?></span>
             </div>
             <?php $dbdm_left = DBDM_Uninstall::leftover_constants($config_path); ?>
             <?php if ($dbdm_left): ?>

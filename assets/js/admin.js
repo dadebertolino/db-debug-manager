@@ -6,24 +6,37 @@
 
     var autoRefreshTimer = null;
 
+    function setStatus(text) {
+        $('#dbdm-log-status').text(text || '');
+    }
+
     function refreshLog() {
         var $viewer = $('#dbdm-log-viewer');
         if (!$viewer.length) return;
 
         var lines = $('#dbdm-log-lines').val() || 500;
+        setStatus(DBDM.i18n.refreshing);
 
         $.post(DBDM.ajax_url, {
             action: 'dbdm_refresh_log',
             nonce: DBDM.nonce,
             lines: lines
         }).done(function(res) {
-            if (res && res.success) {
-                var content = res.data.content || DBDM.i18n.empty_log;
-                $viewer.text(content);
-                applyFilter();
-                // Scroll a fondo.
-                $viewer.scrollTop($viewer[0].scrollHeight);
+            if (!res || !res.success) {
+                setStatus(DBDM.i18n.failed);
+                return;
             }
+            // 2.0.0 (bug 43): il filtro riparte dal contenuto nuovo, non da
+            // quello caricato con la pagina.
+            $viewer.data('full', res.data.content || '');
+            applyFilter();
+            $('#dbdm-log-size').text(res.data.exists ? res.data.size : DBDM.i18n.no_log);
+            if (res.data.exists) $('#dbdm-log-missing').remove();
+            $viewer.scrollTop($viewer[0].scrollHeight);
+            setStatus('');
+        }).fail(function(xhr) {
+            // 2.0.0 (bug 57): nonce scaduto (403, "-1") o errore del server.
+            setStatus(xhr && (xhr.status === 403 || xhr.responseText === '-1') ? DBDM.i18n.expired : DBDM.i18n.failed);
         });
     }
 
@@ -32,17 +45,13 @@
         var $viewer = $('#dbdm-log-viewer');
         if (!$viewer.length) return;
 
-        // Recupera il testo pieno dalla prima volta.
-        if (!$viewer.data('full')) {
-            $viewer.data('full', $viewer.text());
-        }
-
+        var full = $viewer.data('full') || '';
         if (!term) {
-            $viewer.text($viewer.data('full'));
+            $viewer.text(full || DBDM.i18n.empty_log);
             return;
         }
 
-        var filtered = $viewer.data('full')
+        var filtered = full
             .split('\n')
             .filter(function(line) {
                 return line.toLowerCase().indexOf(term) !== -1;
@@ -64,12 +73,7 @@
 
         $('#dbdm-refresh-btn').on('click', refreshLog);
 
-        // Al cambio del selettore righe aggiorna e memorizza testo pieno nuovo.
-        $('#dbdm-log-lines').on('change', function() {
-            var $v = $('#dbdm-log-viewer');
-            $v.removeData('full');
-            refreshLog();
-        });
+        $('#dbdm-log-lines').on('change', refreshLog);
 
         // Filtro log con debounce leggero.
         var filterTimer = null;
@@ -78,10 +82,11 @@
             filterTimer = setTimeout(applyFilter, 150);
         });
 
-        // Inizializza il valore "full" per permettere filtri senza fetch.
+        // Testo pieno per filtrare senza richieste.
         var $viewer = $('#dbdm-log-viewer');
         if ($viewer.length) {
             $viewer.data('full', $viewer.text());
+            if (!$viewer.text()) $viewer.text(DBDM.i18n.empty_log);
         }
 
         // Auto-refresh toggle.

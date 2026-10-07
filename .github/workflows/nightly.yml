@@ -3,7 +3,8 @@ name: Nightly
 # Controllo notturno contro ciò che cambia senza un nostro commit:
 #   - WordPress in sviluppo (trunk) → avvisa prima che una nuova versione
 #     rompa il plugin (wp-config.php, aggiornamenti, sessioni);
-#   - PHP più recente (8.4) negli E2E, che la CI normale esegue solo su 8.1.
+#   - matrice PHP 8.1 / 8.3 / 8.4 × WordPress 6.0 / ultima release / trunk
+#     negli E2E (la CI di ogni PR esegue .wp-env.json e WordPress 6.0);
 #     PHP 7.4 resta coperto dagli unit test a ogni push: negli E2E l'immagine
 #     wp-env per 7.4 (Debian 11, fuori supporto) non si costruisce più;
 #   - Playwright e wp-env alle versioni del lockfile.
@@ -30,12 +31,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: wp-trunk
+          # Matrice PHP × WordPress (TESTING-PLAN.md §6): sviluppo, ultima
+          # release, minimo dichiarato.
+          - label: wp-trunk-php-8.3
             core: WordPress/WordPress#master
             php: '8.3'
-          - label: php-8.4
-            core: ''
+          - label: wp-latest-php-8.3
+            core: https://wordpress.org/latest.zip
+            php: '8.3'
+          - label: wp-latest-php-8.4
+            core: https://wordpress.org/latest.zip
             php: '8.4'
+          - label: wp-6.0-php-8.1
+            core: WordPress/WordPress#6.0
+            php: '8.1'
     uses: ./.github/workflows/e2e.yml
     with:
       core: ${{ matrix.core }}

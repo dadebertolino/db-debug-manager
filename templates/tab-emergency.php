@@ -79,13 +79,13 @@ if (!$dbdm_is_apache):
             <?php wp_nonce_field('dbdm_save_emergency'); ?>
 
             <p>
-                <label>
+                <label for="dbdm-em-password">
                     <strong><?php esc_html_e('Nuova password', 'db-debug-manager'); ?></strong>
                     <?php if ($has_pwd): ?>
                         <span class="db-ui-text-muted"> — <?php esc_html_e('lascia vuoto per mantenere l\'attuale', 'db-debug-manager'); ?></span>
                     <?php endif; ?>
                 </label><br>
-                <input type="password" name="dbdm_password" autocomplete="new-password" style="width:320px;" minlength="12" <?php echo $has_pwd ? '' : 'required'; ?>>
+                <input type="password" id="dbdm-em-password" name="dbdm_password" autocomplete="new-password" style="width:320px;" minlength="12" <?php echo $has_pwd ? '' : 'required'; ?>>
             </p>
             <p class="description" style="color:var(--db-text-muted); font-size:12px;">
                 <?php esc_html_e('Minimo 12 caratteri, con maiuscole, minuscole e numeri. Salvata come hash bcrypt.', 'db-debug-manager'); ?>
@@ -133,7 +133,7 @@ if (!$dbdm_is_apache):
     <div class="db-ui-card-body" style="font-size:13px; line-height:1.7;">
         <ol style="margin:0; padding-left:20px;">
             <li><?php esc_html_e('In una finestra privata del browser, apri:', 'db-debug-manager'); ?>
-                <br><a href="<?php echo esc_url($access_url); ?>" target="_blank"><code><?php echo esc_html($access_url); ?></code></a>
+                <br><a href="<?php echo esc_url($access_url); ?>" target="_blank" rel="noopener" style="word-break:break-all;"><?php echo esc_html($access_url); ?></a>
             </li>
             <li><?php esc_html_e('Inserisci la password configurata.', 'db-debug-manager'); ?></li>
             <li><?php esc_html_e('Se vedi la dashboard, funziona anche quando WP è morto.', 'db-debug-manager'); ?></li>

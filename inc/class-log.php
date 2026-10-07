@@ -97,7 +97,51 @@ class DBDM_Log {
         if (!self::exists()) {
             return '';
         }
-        return self::tail_file(self::get_path(), max(10, min(10000, (int) $lines)));
+        return self::to_utf8(self::tail_file(self::get_path(), max(10, min(10000, (int) $lines))));
+    }
+
+    /**
+     * Testo con i byte non UTF-8 sostituiti da U+FFFD. 2.0.0 (bug 44): con
+     * un solo byte non valido (log in Latin-1, riga tagliata) esc_html()
+     * restituiva '' e json_encode() false: viewer e aggiornamento vuoti.
+     */
+    public static function to_utf8($text) {
+        $text = (string) $text;
+        if (preg_match('//u', $text)) {
+            return $text;
+        }
+        return htmlspecialchars_decode(htmlspecialchars($text, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'), ENT_NOQUOTES);
+    }
+
+    /**
+     * Invia il file come download: esattamente $size byte (Content-Length
+     * coerente anche se il file cresce nel frattempo), buffer svuotati,
+     * nosniff. 2.0.0 (bug 53).
+     */
+    public static function send_download($path, $filename) {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        clearstatcache(true, $path);
+        $size = (int) filesize($path);
+        $fp   = @fopen($path, 'rb');
+        if (!$fp) {
+            return false;
+        }
+        nocache_headers();
+        header('Content-Type: text/plain; charset=utf-8');
+        header('X-Content-Type-Options: nosniff');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . $size);
+        $left = $size;
+        while ($left > 0 && !feof($fp)) {
+            $chunk = fread($fp, (int) min(65536, $left));
+            if ($chunk === false || $chunk === '') break;
+            echo $chunk; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- contenuto del file scaricato, non HTML.
+            $left -= strlen($chunk);
+        }
+        fclose($fp);
+        return true;
     }
 
     /** Byte letti al massimo dalla fine del file. */

@@ -1,0 +1,763 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the DB Debug Manager package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: DB Debug Manager\n"
+"Report-Msgid-Bugs-To: https://github.com/dadebertolino/db-debug-manager/"
+"issues\n"
+"POT-Creation-Date: 2026-10-06 17:22+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: inc/class-admin.php:59 inc/class-admin.php:68 templates/page.php:14
+msgid "DB Debug Manager"
+msgstr ""
+
+#: inc/class-admin.php:60 inc/class-admin.php:69
+msgid "Debug Manager"
+msgstr ""
+
+#: inc/class-admin.php:87
+msgid "Svuotare il debug.log? Operazione irreversibile."
+msgstr ""
+
+#: inc/class-admin.php:88
+msgid "Il log è vuoto."
+msgstr ""
+
+#: inc/class-admin.php:89
+msgid "Aggiornamento..."
+msgstr ""
+
+#: inc/class-admin.php:90 templates/tab-log.php:14
+msgid "Nessun log"
+msgstr ""
+
+#: inc/class-admin.php:91
+msgid "Sessione scaduta: ricarica la pagina."
+msgstr ""
+
+#: inc/class-admin.php:92
+msgid "Aggiornamento non riuscito."
+msgstr ""
+
+#: inc/class-admin.php:126 inc/class-admin.php:212 inc/class-admin.php:226
+#: inc/class-admin.php:246 inc/class-admin.php:262 inc/class-admin.php:306
+#: inc/class-admin.php:315 inc/class-admin.php:331 inc/class-admin.php:348
+#: inc/class-admin.php:373 inc/class-admin.php:388
+msgid "Permessi insufficienti."
+msgstr ""
+
+#: inc/class-admin.php:134
+msgid ""
+"Impostazioni salvate. Ricarica la pagina per vedere lo stato aggiornato."
+msgstr ""
+
+#: inc/class-admin.php:219
+msgid "Log svuotato."
+msgstr ""
+
+#: inc/class-admin.php:231
+msgid "Nessun log disponibile."
+msgstr ""
+
+#: inc/class-admin.php:235
+msgid "Log non leggibile."
+msgstr ""
+
+#: inc/class-admin.php:270
+msgid "Password emergency rimossa e accesso disattivato."
+msgstr ""
+
+#: inc/class-admin.php:283
+msgid "Imposta prima una password."
+msgstr ""
+
+#: inc/class-admin.php:299
+msgid "Impostazioni emergency salvate."
+msgstr ""
+
+#: inc/class-admin.php:309
+msgid "Log emergency svuotato."
+msgstr ""
+
+#: inc/class-admin.php:324
+msgid "Snapshot creato."
+msgstr ""
+
+#: inc/class-admin.php:337 inc/class-snapshots.php:442
+msgid "Snapshot non trovato."
+msgstr ""
+
+#: inc/class-admin.php:339 inc/class-admin.php:378 inc/class-snapshots.php:150
+msgid "Impossibile scrivere file snapshot."
+msgstr ""
+
+#: inc/class-admin.php:341
+msgid "Snapshot eliminato."
+msgstr ""
+
+#: inc/class-admin.php:357
+msgid "Seleziona almeno una parte da ripristinare."
+msgstr ""
+
+#: inc/class-admin.php:376
+msgid "Tutti gli snapshot eliminati."
+msgstr ""
+
+#: inc/class-admin.php:409
+#, php-format
+msgid "Eliminando il plugin restano in wp-config.php: %s"
+msgstr ""
+
+#: inc/class-config.php:111
+#, php-format
+msgid "Costante non gestita: %s"
+msgstr ""
+
+#: inc/class-config.php:117
+msgid ""
+"Modifiche ai file disattivate (DISALLOW_FILE_MODS): wp-config.php va "
+"modificato a mano."
+msgstr ""
+
+#: inc/class-config.php:122
+msgid "wp-config.php non trovato."
+msgstr ""
+
+#: inc/class-config.php:125
+msgid "wp-config.php non è scrivibile. Controlla i permessi del file."
+msgstr ""
+
+#: inc/class-emergency.php:77
+#, php-format
+msgid "La password deve avere almeno %d caratteri."
+msgstr ""
+
+#: inc/class-emergency.php:82
+msgid "La password deve contenere maiuscole, minuscole e numeri."
+msgstr ""
+
+#: inc/class-log.php:209
+msgid "debug.log non è scrivibile."
+msgstr ""
+
+#: inc/class-log.php:212
+msgid "Impossibile svuotare il log."
+msgstr ""
+
+#: inc/class-snapshots.php:54
+#, php-format
+msgid "Prima dell'aggiornamento del plugin %s"
+msgstr ""
+
+#: inc/class-snapshots.php:56
+#, php-format
+msgid "Prima dell'aggiornamento del tema %s"
+msgstr ""
+
+#: inc/class-snapshots.php:59
+msgid "Prima dell'installazione di un plugin"
+msgstr ""
+
+#: inc/class-snapshots.php:60
+msgid "Prima dell'installazione di un tema"
+msgstr ""
+
+#: inc/class-snapshots.php:75 inc/class-snapshots.php:81
+msgid "Attivazione Emergency Access"
+msgstr ""
+
+#: inc/class-snapshots.php:95
+#, php-format
+msgid "Dopo l'aggiornamento di WordPress a %s"
+msgstr ""
+
+#: inc/class-snapshots.php:423
+#, php-format
+msgid "Plugin attivi in rete ripristinati: %d."
+msgstr ""
+
+#: inc/class-snapshots.php:424
+#, php-format
+msgid "Plugin attivi ripristinati: %d."
+msgstr ""
+
+#: inc/class-snapshots.php:427
+#, php-format
+msgid "Non ripristinati (non più installati): %s"
+msgstr ""
+
+#: inc/class-snapshots.php:430
+#, php-format
+msgid "Attivazione non riuscita: %s"
+msgstr ""
+
+#: inc/class-snapshots.php:473
+#, php-format
+msgid "Tema non più installato: %s"
+msgstr ""
+
+#: inc/class-snapshots.php:476
+#, php-format
+msgid "Tema non ripristinato: il tema padre \"%1$s\" di %2$s non è installato."
+msgstr ""
+
+#: inc/class-snapshots.php:481
+#, php-format
+msgid "Tema ripristinato: %s"
+msgstr ""
+
+#: templates/page.php:29
+msgid "Costanti"
+msgstr ""
+
+#: templates/page.php:30 templates/tab-log.php:12
+msgid "Debug Log"
+msgstr ""
+
+#: templates/page.php:31
+msgid "Query SQL"
+msgstr ""
+
+#: templates/page.php:32
+msgid "Snapshots"
+msgstr ""
+
+#: templates/page.php:33
+msgid "Emergency"
+msgstr ""
+
+#: templates/tab-config.php:9
+msgid ""
+"Abilita la modalità debug di WordPress. Richiesta per attivare le altre "
+"opzioni."
+msgstr ""
+
+#: templates/tab-config.php:13
+msgid "Scrive errori e warning nel file wp-content/debug.log."
+msgstr ""
+
+#: templates/tab-config.php:17
+msgid ""
+"Mostra gli errori direttamente nelle pagine. DA TENERE DISATTIVATO IN "
+"PRODUZIONE."
+msgstr ""
+
+#: templates/tab-config.php:21
+msgid ""
+"Carica le versioni non minificate di script e stili di WordPress. Utile in "
+"sviluppo."
+msgstr ""
+
+#: templates/tab-config.php:25
+msgid ""
+"Salva tutte le query SQL eseguite in $wpdb->queries. Impatta le performance: "
+"usare solo in debug."
+msgstr ""
+
+#: templates/tab-config.php:35
+msgid "Modifiche ai file disattivate (DISALLOW_FILE_MODS)."
+msgstr ""
+
+#: templates/tab-config.php:36
+msgid ""
+"Il plugin non modifica wp-config.php: le costanti qui sotto sono in sola "
+"lettura e vanno cambiate a mano."
+msgstr ""
+
+#: templates/tab-config.php:43
+msgid "wp-config.php non è scrivibile."
+msgstr ""
+
+#: templates/tab-config.php:44
+#, php-format
+msgid "Percorso rilevato: %s"
+msgstr ""
+
+#: templates/tab-config.php:45
+msgid ""
+"Modifica i permessi del file (consigliato 0644) per poter salvare le "
+"impostazioni da qui."
+msgstr ""
+
+#: templates/tab-config.php:52
+msgid "Stato costanti di debug"
+msgstr ""
+
+#: templates/tab-config.php:62 templates/tab-config.php:89
+#: templates/tab-config.php:92
+msgid "Attiva"
+msgstr ""
+
+#: templates/tab-config.php:63
+msgid "Costante"
+msgstr ""
+
+#: templates/tab-config.php:64
+msgid "Stato attuale"
+msgstr ""
+
+#: templates/tab-config.php:65
+msgid "Descrizione"
+msgstr ""
+
+#: templates/tab-config.php:90
+msgid "file custom:"
+msgstr ""
+
+#: templates/tab-config.php:94
+msgid "Definita, disattiva"
+msgstr ""
+
+#: templates/tab-config.php:96
+msgid "Non definita"
+msgstr ""
+
+#: templates/tab-config.php:102
+msgid "Attenzione"
+msgstr ""
+
+#: templates/tab-config.php:112
+msgid "Salva modifiche"
+msgstr ""
+
+#: templates/tab-config.php:114
+msgid ""
+"Le modifiche hanno effetto al prossimo caricamento pagina. Prima di ogni "
+"salvataggio wp-config.php viene copiato nella cartella privata (wp-content/"
+"dbdm-private-…)."
+msgstr ""
+
+#: templates/tab-config.php:119
+#, php-format
+msgid ""
+"Se elimini il plugin, queste costanti restano in wp-config.php: %s. Spegnile "
+"qui prima, se non servono più."
+msgstr ""
+
+#: templates/tab-config.php:128
+msgid "Informazioni sistema"
+msgstr ""
+
+#: templates/tab-config.php:134
+msgid "Scrivibile"
+msgstr ""
+
+#: templates/tab-config.php:136
+msgid "Log presente"
+msgstr ""
+
+#: templates/tab-emergency.php:21
+msgid "Server non Apache rilevato."
+msgstr ""
+
+#: templates/tab-emergency.php:22
+msgid ""
+"I file interni del plugin (log, snapshot, backup di wp-config) sono in una "
+"cartella con nome casuale e protetta da .htaccess, ma su Nginx l'.htaccess "
+"viene ignorato. Per una protezione esplicita aggiungi alla configurazione "
+"del server:"
+msgstr ""
+
+#: templates/tab-emergency.php:31
+msgid "Funzione sensibile."
+msgstr ""
+
+#: templates/tab-emergency.php:32
+msgid ""
+"L'accesso emergency bypassa completamente l'autenticazione di WordPress e "
+"consente operazioni come disattivare plugin o cambiare tema anche quando il "
+"sito è down. Usa una password forte e tieni questa funzione disattivata "
+"quando non serve."
+msgstr ""
+
+#: templates/tab-emergency.php:38
+msgid "Stato"
+msgstr ""
+
+#: templates/tab-emergency.php:44
+msgid "Accesso attivo"
+msgstr ""
+
+#: templates/tab-emergency.php:47
+msgid "Sì"
+msgstr ""
+
+#: templates/tab-emergency.php:49
+msgid "Disattivato"
+msgstr ""
+
+#: templates/tab-emergency.php:54
+msgid "Password configurata"
+msgstr ""
+
+#: templates/tab-emergency.php:59
+msgid "Nessuna"
+msgstr ""
+
+#: templates/tab-emergency.php:64
+msgid "URL accesso"
+msgstr ""
+
+#: templates/tab-emergency.php:74
+msgid "Configura password e attivazione"
+msgstr ""
+
+#: templates/tab-emergency.php:83
+msgid "Nuova password"
+msgstr ""
+
+#: templates/tab-emergency.php:85
+msgid "lascia vuoto per mantenere l'attuale"
+msgstr ""
+
+#: templates/tab-emergency.php:91
+msgid ""
+"Minimo 12 caratteri, con maiuscole, minuscole e numeri. Salvata come hash "
+"bcrypt."
+msgstr ""
+
+#: templates/tab-emergency.php:97
+msgid "Attiva accesso emergency"
+msgstr ""
+
+#: templates/tab-emergency.php:101
+msgid ""
+"Quando disattivato, emergency.php restituisce un errore anche con la "
+"password corretta. Tienilo spento tranne quando serve davvero."
+msgstr ""
+
+#: templates/tab-emergency.php:107
+msgid "Il sito è dietro un proxy/CDN fidato (es. Cloudflare)"
+msgstr ""
+
+#: templates/tab-emergency.php:111
+msgid ""
+"Attivalo SOLO se tutto il traffico passa da un reverse proxy o CDN: in quel "
+"caso emergency.php userà gli header del proxy (CF-Connecting-IP, X-Forwarded-"
+"For) per identificare l'IP reale nel rate-limit e nei log. Se il sito NON è "
+"dietro proxy, lascialo disattivato: quegli header sono falsificabili e "
+"permetterebbero di aggirare il blocco tentativi."
+msgstr ""
+
+#: templates/tab-emergency.php:116
+msgid "Salva impostazioni"
+msgstr ""
+
+#: templates/tab-emergency.php:119
+msgid "Rimuovere password e disattivare accesso emergency?"
+msgstr ""
+
+#: templates/tab-emergency.php:120
+msgid "Rimuovi password"
+msgstr ""
+
+#: templates/tab-emergency.php:131
+msgid "Come testare"
+msgstr ""
+
+#: templates/tab-emergency.php:135
+msgid "In una finestra privata del browser, apri:"
+msgstr ""
+
+#: templates/tab-emergency.php:138
+msgid "Inserisci la password configurata."
+msgstr ""
+
+#: templates/tab-emergency.php:139
+msgid "Se vedi la dashboard, funziona anche quando WP è morto."
+msgstr ""
+
+#: templates/tab-emergency.php:141
+msgid ""
+"Se la pagina dice «Accesso d'emergenza non disponibile», il motivo (accesso "
+"disattivato, password mancante, database, cartella privata) è scritto nel "
+"log degli errori di PHP del server: per sicurezza non viene mostrato a chi "
+"apre la pagina."
+msgstr ""
+
+#: templates/tab-emergency.php:148
+msgid "Log accessi e tentativi"
+msgstr ""
+
+#: templates/tab-emergency.php:150
+msgid "ultime righe"
+msgstr ""
+
+#: templates/tab-emergency.php:151
+msgid "Svuotare tutti i log di accesso e rate-limit?"
+msgstr ""
+
+#: templates/tab-emergency.php:154
+msgid "Svuota log"
+msgstr ""
+
+#: templates/tab-emergency.php:162
+msgid "Nessun accesso registrato."
+msgstr ""
+
+#: templates/tab-log.php:18
+msgid "Righe:"
+msgstr ""
+
+#: templates/tab-log.php:29
+msgid "Auto-refresh 5s"
+msgstr ""
+
+#: templates/tab-log.php:32
+msgid "Aggiorna"
+msgstr ""
+
+#: templates/tab-log.php:38
+msgid "Scarica"
+msgstr ""
+
+#: templates/tab-log.php:44
+msgid "Svuota"
+msgstr ""
+
+#: templates/tab-log.php:52
+msgid "Nessun file debug.log trovato."
+msgstr ""
+
+#: templates/tab-log.php:53
+msgid ""
+"Abilita WP_DEBUG e WP_DEBUG_LOG nella tab Costanti per iniziare a registrare "
+"gli errori."
+msgstr ""
+
+#: templates/tab-log.php:58
+msgid "Filtra le righe del log"
+msgstr ""
+
+#: templates/tab-log.php:58
+msgid "Filtra righe (es: Fatal, Notice, Warning)..."
+msgstr ""
+
+#: templates/tab-queries.php:13
+msgid "Registrazione delle query"
+msgstr ""
+
+#: templates/tab-queries.php:17
+msgid ""
+"Vengono registrate solo le pagine del sito che visiti tu, da amministratore "
+"collegato, mentre la registrazione è attiva: mai le visite degli altri "
+"utenti, il login, le chiamate REST o AJAX."
+msgstr ""
+
+#: templates/tab-queries.php:23
+#, php-format
+msgid "Attiva ancora per %d minuti"
+msgstr ""
+
+#: templates/tab-queries.php:24
+msgid "Ferma la registrazione"
+msgstr ""
+
+#: templates/tab-queries.php:27
+msgid "Registra le mie pagine per 30 minuti"
+msgstr ""
+
+#: templates/tab-queries.php:37
+msgid ""
+"SAVEQUERIES non è attiva. Abilitala nella tab Costanti per registrare le "
+"query SQL eseguite su ciascuna pagina frontend."
+msgstr ""
+
+#: templates/tab-queries.php:44
+msgid "Ultimo snapshot query frontend"
+msgstr ""
+
+#: templates/tab-queries.php:47
+msgid "query"
+msgstr ""
+
+#: templates/tab-queries.php:57
+msgid "Nessuno snapshot disponibile."
+msgstr ""
+
+#: templates/tab-queries.php:58
+msgid ""
+"Con SAVEQUERIES attiva e la registrazione accesa, visita una pagina del sito "
+"e ricarica questa scheda."
+msgstr ""
+
+#: templates/tab-queries.php:63
+msgid "URL"
+msgstr ""
+
+#: templates/tab-queries.php:65
+msgid "Ora"
+msgstr ""
+
+#: templates/tab-queries.php:69
+msgid "Filtra SQL (es: wp_options, SELECT, JOIN)..."
+msgstr ""
+
+#: templates/tab-queries.php:69
+msgid "Filtra le query"
+msgstr ""
+
+#: templates/tab-queries.php:76
+msgid "Tempo"
+msgstr ""
+
+#: templates/tab-queries.php:77
+msgid "SQL"
+msgstr ""
+
+#: templates/tab-queries.php:78
+msgid "Caller"
+msgstr ""
+
+#: templates/tab-snapshots.php:12
+msgid "Manuale"
+msgstr ""
+
+#: templates/tab-snapshots.php:13
+msgid "Emergency attivato"
+msgstr ""
+
+#: templates/tab-snapshots.php:14
+msgid "Pre-aggiornamento"
+msgstr ""
+
+#: templates/tab-snapshots.php:15
+msgid "Post-aggiornamento"
+msgstr ""
+
+#: templates/tab-snapshots.php:23
+msgid "Preflight snapshot."
+msgstr ""
+
+#: templates/tab-snapshots.php:24
+msgid ""
+"Registra la lista dei plugin attivi, il tema e le versioni installate. Se un "
+"aggiornamento rompe il sito, puoi ripristinare lo stato dei plugin attivi e "
+"del tema (i file invece restano come sono — i backup dei file richiedono un "
+"vero backup server)."
+msgstr ""
+
+#: templates/tab-snapshots.php:30
+msgid "Crea snapshot manuale"
+msgstr ""
+
+#: templates/tab-snapshots.php:37
+msgid "Nota (opzionale):"
+msgstr ""
+
+#: templates/tab-snapshots.php:38
+msgid "Es: prima update WooCommerce"
+msgstr ""
+
+#: templates/tab-snapshots.php:40
+msgid "Crea snapshot adesso"
+msgstr ""
+
+#: templates/tab-snapshots.php:42
+#, php-format
+msgid "Si conservano gli ultimi %d snapshot manuali e altrettanti automatici."
+msgstr ""
+
+#: templates/tab-snapshots.php:50
+msgid "Snapshot disponibili"
+msgstr ""
+
+#: templates/tab-snapshots.php:54
+msgid "Eliminare tutti gli snapshot?"
+msgstr ""
+
+#: templates/tab-snapshots.php:57
+msgid "Elimina tutti"
+msgstr ""
+
+#: templates/tab-snapshots.php:67
+msgid ""
+"Nessuno snapshot ancora. Crea il primo manualmente, oppure verrà creato "
+"automaticamente quando attivi l'emergency o quando WordPress completa un "
+"aggiornamento."
+msgstr ""
+
+#: templates/tab-snapshots.php:84
+msgid "Stato corrente"
+msgstr ""
+
+#: templates/tab-snapshots.php:97
+msgid "plugin attivi"
+msgstr ""
+
+#: templates/tab-snapshots.php:104
+msgid "Differenze rispetto ad adesso:"
+msgstr ""
+
+#: templates/tab-snapshots.php:109
+#, php-format
+msgid "Tema cambiato: %1$s → %2$s"
+msgstr ""
+
+#: templates/tab-snapshots.php:117
+#, php-format
+msgid "%d plugin attivati dopo lo snapshot"
+msgstr ""
+
+#: templates/tab-snapshots.php:130
+#, php-format
+msgid "%d plugin disattivati dopo lo snapshot"
+msgstr ""
+
+#: templates/tab-snapshots.php:143
+#, php-format
+msgid "%d plugin attivati in rete dopo lo snapshot"
+msgstr ""
+
+#: templates/tab-snapshots.php:149
+#, php-format
+msgid "%d plugin disattivati in rete dopo lo snapshot"
+msgstr ""
+
+#: templates/tab-snapshots.php:155
+#, php-format
+msgid "%d plugin aggiornati"
+msgstr ""
+
+#: templates/tab-snapshots.php:165
+#, php-format
+msgid "%d plugin installati dopo"
+msgstr ""
+
+#: templates/tab-snapshots.php:169
+#, php-format
+msgid "%d plugin rimossi"
+msgstr ""
+
+#: templates/tab-snapshots.php:181
+msgid ""
+"Ripristinare questo snapshot? L'azione modifica plugin attivi/tema nel "
+"database."
+msgstr ""
+
+#: templates/tab-snapshots.php:185
+msgid "Plugin attivi"
+msgstr ""
+
+#: templates/tab-snapshots.php:186
+msgid "Tema"
+msgstr ""
+
+#: templates/tab-snapshots.php:187
+msgid "Ripristina"
+msgstr ""
+
+#: templates/tab-snapshots.php:195
+msgid "Elimina snapshot"
+msgstr ""

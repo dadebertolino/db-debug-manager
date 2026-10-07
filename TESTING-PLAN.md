@@ -100,23 +100,23 @@ end-to-end (wp-env + Playwright, anche HTTP diretto su `emergency.php`).
 | 40 ✅ | A | `class-admin.php:39` | Multisite: ogni amministratore di sito ha `manage_options` e può riscrivere il `wp-config.php` della rete e leggere il log di tutti i siti | I (multisite) + E |
 | 41 ✅ | A | `class-admin.php:113` | Attivando `WP_DEBUG_LOG` il log finisce in `/wp-content/debug.log`, **pubblico**, senza avviso | E (GET anonimo) |
 | 42 ✅ | A | `class-snapshots.php:206` | Un nome di plugin con UTF-8 non valido fa fallire `json_encode` e la scrittura **cancella tutti gli snapshot** | U |
-| 43 | B | `admin.js:20-42` | "Aggiorna" e auto-refresh del log mostrano sempre il contenuto di quando la pagina è stata caricata (verificato) | E |
-| 44 | B | `tab-log.php:65`, `tab-queries.php:67` | Un byte UTF-8 non valido rende vuoto il viewer | E |
+| 43 ✅ | B | `admin.js:20-42` | "Aggiorna" e auto-refresh del log mostrano sempre il contenuto di quando la pagina è stata caricata (verificato) | E |
+| 44 ✅ | B | `tab-log.php:65`, `tab-queries.php:67` | Un byte UTF-8 non valido rende vuoto il viewer | E |
 | 45 ✅ | B | `class-snapshots.php:48-64,154` | Gli snapshot automatici (uno per aggiornamento, dopo l'aggiornamento) espellono quelli manuali dai 5 posti; deduplica che ignora temi e core | I |
 | 46 ✅ | B | `class-snapshots.php:313,328` | Ripristino con `update_option` invece di `switch_theme()`/attivazione: niente hook, tema padre non verificato, `autoload` portato a `false` su `active_plugins`, `stylesheet`, `template` | I |
 | 47 ✅ | B | `class-snapshots.php:115` | Multisite: plugin attivi in rete ignorati in cattura, diff e ripristino | I (multisite) |
-| 48 | B | `class-admin.php:303,278` | "Ripristino completato" ed "eliminato" mostrati anche in caso di errore | E |
+| 48 ✅ | B | `class-admin.php:303,278` | "Ripristino completato" ed "eliminato" mostrati anche in caso di errore | E |
 | 49 ✅ | B | `class-queries.php:31-64` | Il monitor salva fino a 500 query complete a ogni richiesta pubblica (login, REST, checkout, WP-CLI): email, indirizzi, token di sessione nel database e nei backup; una scrittura pesante per richiesta | I |
 | 50 ✅ | B | `db-debug-manager.php` | Manca `Update URI`: lo slug può ricevere "aggiornamenti" da un plugin omonimo su wordpress.org; `DISALLOW_FILE_MODS` non rispettato per `wp-config.php` | U |
 | 51 ✅ | C | — | Nessuna disinstallazione: restano opzioni, transient, cartella privata e le costanti scritte in `wp-config.php` | I |
 | 52 ✅ | C | `class-log.php:57` | Lettura della coda del log quadratica, memoria illimitata su righe lunghissime; `tail()` restituisce N+1 righe | U |
-| 53 | C | `class-admin.php:165` | Download del log: buffer non svuotati, `Content-Length` che cambia, niente `nosniff` | E |
-| 54 | C | `page.php:24-65` | Messaggi `err` dalla query string mostrati in admin (contenuto arbitrario via link) | E |
+| 53 ✅ | C | `class-admin.php:165` | Download del log: buffer non svuotati, `Content-Length` che cambia, niente `nosniff` | E |
+| 54 ✅ | C | `page.php:24-65` | Messaggi `err` dalla query string mostrati in admin (contenuto arbitrario via link) | E |
 | 55 ✅ | C | `class-emergency.php:111` | Cartella privata `0755`, file `0644` (backup con credenziali leggibile da altri utenti su hosting condiviso); token creato due volte in caso di richieste concorrenti; cartella creata da root con WP-CLI | I |
 | 56 ✅ | C | `class-snapshots.php:86` | Lettura e scrittura degli snapshot senza lock tra pannello ed emergency | I |
-| 57 | C | `admin.js` | Senza `debug.log` al caricamento il viewer non esiste e l'auto-refresh non fa nulla; nessun `.fail()` (nonce scaduto) | E |
-| 58 | C | template | i18n assente (`load_plugin_textdomain`, `Domain Path`); stringhe non traducibili; percorso del backup indicato in modo errato | — |
-| 59 | C | template | Accessibilità: checkbox delle costanti senza etichetta, filtri con solo placeholder, pulsante 🗑 senza nome, `#999` su bianco (2,8:1) | E (axe) |
+| 57 ✅ | C | `admin.js` | Senza `debug.log` al caricamento il viewer non esiste e l'auto-refresh non fa nulla; nessun `.fail()` (nonce scaduto) | E |
+| 58 ✅ | C | template | i18n assente (`load_plugin_textdomain`, `Domain Path`); stringhe non traducibili; percorso del backup indicato in modo errato | — |
+| 59 ✅ | C | template | Accessibilità: checkbox delle costanti senza etichetta, filtri con solo placeholder, pulsante 🗑 senza nome, `#999` su bianco (2,8:1) | E (axe) |
 | 60 ✅ | B | `tab-emergency.php:23` | La regola Nginx suggerita protegge ancora `plugins/db-debug-manager/private`: dalla 1.4.0 la cartella privata è `wp-content/dbdm-private-*` (trovato nella Fase 1) | E |
 
 Legenda (aggiornata alla Fase A, 2026-10-06): ✅ corretto con test · ½ in
@@ -244,46 +244,46 @@ token usa INSERT IGNORE.
 Ogni flusso utente, nel browser e via HTTP diretto, su una matrice ampia.
 
 **Pannello admin** (`tools.php?page=db-debug-manager`):
-- [ ] Costanti: ogni costante on/off, effetto reale alla richiesta
+- [x] Costanti: ogni costante on/off, effetto reale alla richiesta
       successiva (notice visibile o no, `SAVEQUERIES` che cattura),
       `wp-config` non scrivibile, varianti del corpus, percorso personalizzato
       del log, su un sito pulito solo ciò che l'admin ha toccato (bug 8).
-- [ ] Log: viewer, righe, filtro, **aggiorna e auto-refresh con righe nuove**
+- [x] Log: viewer, righe, filtro, **aggiorna e auto-refresh con righe nuove**
       (43), UTF-8 non valido (44), file assente poi creato (57), download
       (nome, contenuto, header), svuota con conferma, log non pubblico (41).
-- [ ] Query: cattura dopo una visita, lente evidenziate, filtro.
-- [ ] Snapshots: crea con nota, diff dopo attivazioni e aggiornamenti
+- [x] Query: cattura dopo una visita, lente evidenziate, filtro.
+- [x] Snapshots: crea con nota, diff dopo attivazioni e aggiornamenti
       simulati, ripristino selettivo (plugin, tema, entrambi), plugin rimossi,
       tema padre mancante, elimina, elimina tutti, messaggi corretti (48).
-- [ ] Emergency (tab): password (lunghezza, conferma), abilita, rimuovi,
+- [x] Emergency (tab): password (lunghezza, conferma), abilita, rimuovi,
       proxy, svuota log, avviso Nginx.
 
 **`emergency.php` su HTTP, senza WordPress caricato**:
-- [ ] funziona su wp-env standard (`getenv_docker`, bug 10);
-- [ ] stati di errore: disattivato, senza password, DB irraggiungibile,
+- [x] funziona su wp-env standard (`getenv_docker`, bug 10);
+- [x] stati di errore: disattivato, senza password, DB irraggiungibile,
       `wp-config` illeggibile — senza rivelare dettagli (37);
-- [ ] login: password errata, CSRF scaduto, input come array (33),
+- [x] login: password errata, CSRF scaduto, input come array (33),
       **blocco dopo 5 tentativi anche con 20 richieste parallele** (11),
       proxy e header falsificati (16), sblocco allo scadere;
-- [ ] sessione: rigenerata al login (12), invalidata da cambio password,
+- [x] sessione: rigenerata al login (12), invalidata da cambio password,
       disattivazione emergency, disattivazione plugin (13, 14), scadenza,
       logout via POST (38), cookie e header (35);
-- [ ] **scenario "sito rotto"**: un plugin di prova manda in fatal tutto il
+- [x] **scenario "sito rotto"**: un plugin di prova manda in fatal tutto il
       sito; dall'emergency lo si individua nel log, lo si disattiva (singolo
       e tutti), il sito torna a rispondere; stesso con un tema rotto e
       "Cambia a tema default" (28); ripristino di uno snapshot (17);
-- [ ] toggle costanti dall'emergency con percorso del log conservato (20),
+- [x] toggle costanti dall'emergency con percorso del log conservato (20),
       log con UTF-8 non valido (19), slug con apostrofo (18), azioni senza
       effetto riportate come tali (30);
-- [ ] cartella privata mai raggiungibile via HTTP (15) e mai cancellata
+- [x] cartella privata mai raggiungibile via HTTP (15) e mai cancellata
       dagli aggiornamenti (39).
 
 **Trasversali**:
-- [ ] accessibilità axe-core WCAG 2.1 AA su tutte le tab e su
+- [x] accessibilità axe-core WCAG 2.1 AA su tutte le tab e su
       `emergency.php` (59);
-- [ ] multisite: amministratore di sito senza accesso (40), azioni
+- [x] multisite: amministratore di sito senza accesso (40), azioni
       dell'emergency sulla rete (26);
-- [ ] matrice: PHP 8.1 / 8.3 / 8.4, WordPress 6.0 (o minimo deciso) /
+- [x] matrice: PHP 8.1 / 8.3 / 8.4, WordPress 6.0 (o minimo deciso) /
       latest / trunk, single e multisite; nightly sulla matrice completa.
 
 ## 7. Decisioni (prese il 2026-10-06)
@@ -345,6 +345,15 @@ Tutti i bug di priorità A (1–4, 10–17, 39–42) più alcuni B/C collegati (
 Nuovo file: `inc/class-emergency-guard.php` (regole di sicurezza
 dell'emergency, senza WordPress). Il refactor completo di `emergency.php`
 resta nella 2.0.0.
+
+### Fasi 1–3 — fatte (→ 2.0.0)
+
+Fase 1 (PR #4), Fase 2 (PR #5), Fase 3 (PR #6). A fine piano: 205 unit,
+integration su WordPress 6.0, latest e multisite, 44 E2E a ogni PR (su
+`.wp-env.json` e su WordPress 6.0), matrice PHP × WordPress nella nightly.
+Il multisite non ha E2E (wp-env richiederebbe un ambiente a parte): è
+coperto dagli integration con `WP_MULTISITE=1` e, per l'emergency, dagli
+unit su SQLite.
 
 ### Ordine di lavoro
 

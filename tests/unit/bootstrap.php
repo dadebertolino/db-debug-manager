@@ -462,6 +462,11 @@ if ( ! function_exists( 'wp_salt' ) ) {
 		return 'dbdm-test-salt-' . $scheme;
 	}
 }
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	function get_current_user_id() {
+		return isset( $GLOBALS['__dbdm_user_id'] ) ? (int) $GLOBALS['__dbdm_user_id'] : 0;
+	}
+}
 if ( ! function_exists( 'is_admin' ) ) {
 	function is_admin() {
 		return ! empty( $GLOBALS['__dbdm_is_admin'] );

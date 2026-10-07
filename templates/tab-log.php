@@ -11,11 +11,8 @@ $log_content = $log_exists ? DBDM_Log::tail(500) : '';
     <div class="db-ui-card-header dbdm-log-header">
         <h3><?php esc_html_e('Debug Log', 'db-debug-manager'); ?></h3>
         <div class="dbdm-log-meta">
-            <?php if ($log_exists): ?>
-                <span class="db-ui-badge db-ui-badge-primary"><?php echo esc_html($log_size); ?></span>
-            <?php else: ?>
-                <span class="db-ui-badge db-ui-badge-muted"><?php esc_html_e('Nessun log', 'db-debug-manager'); ?></span>
-            <?php endif; ?>
+            <span id="dbdm-log-size" class="db-ui-badge <?php echo $log_exists ? 'db-ui-badge-primary' : 'db-ui-badge-muted'; ?>"><?php echo $log_exists ? esc_html($log_size) : esc_html__('Nessun log', 'db-debug-manager'); ?></span>
+            <span id="dbdm-log-status" class="db-ui-text-muted" role="status" aria-live="polite"></span>
 
             <label class="dbdm-inline-label">
                 <?php esc_html_e('Righe:', 'db-debug-manager'); ?>
@@ -51,18 +48,15 @@ $log_content = $log_exists ? DBDM_Log::tail(500) : '';
     </div>
     <div class="db-ui-card-body">
         <?php if (!$log_exists): ?>
-            <div class="db-ui-empty">
-                <span class="db-ui-empty-icon">📋</span>
-                <span class="db-ui-empty-text">
-                    <?php esc_html_e('Nessun file debug.log trovato.', 'db-debug-manager'); ?><br>
-                    <?php esc_html_e('Abilita WP_DEBUG e WP_DEBUG_LOG nella tab Costanti per iniziare a registrare gli errori.', 'db-debug-manager'); ?>
-                </span>
-            </div>
-        <?php else: ?>
-            <div class="dbdm-log-search">
-                <input type="text" id="dbdm-log-filter" placeholder="<?php esc_attr_e('Filtra righe (es: Fatal, Notice, Warning)...', 'db-debug-manager'); ?>">
-            </div>
-            <pre id="dbdm-log-viewer" class="dbdm-log-viewer"><?php echo esc_html($log_content); ?></pre>
+            <p class="db-ui-text-muted" id="dbdm-log-missing">
+                <?php esc_html_e('Nessun file debug.log trovato.', 'db-debug-manager'); ?>
+                <?php esc_html_e('Abilita WP_DEBUG e WP_DEBUG_LOG nella tab Costanti per iniziare a registrare gli errori.', 'db-debug-manager'); ?>
+            </p>
         <?php endif; ?>
+        <!-- 2.0.0 (bug 57): viewer sempre presente, così aggiorna e auto-refresh funzionano anche se il log nasce dopo. -->
+        <div class="dbdm-log-search">
+            <input type="text" id="dbdm-log-filter" aria-label="<?php esc_attr_e('Filtra le righe del log', 'db-debug-manager'); ?>" placeholder="<?php esc_attr_e('Filtra righe (es: Fatal, Notice, Warning)...', 'db-debug-manager'); ?>">
+        </div>
+        <pre id="dbdm-log-viewer" class="dbdm-log-viewer"><?php echo esc_html($log_content); ?></pre>
     </div>
 </div>

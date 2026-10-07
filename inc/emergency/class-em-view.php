@@ -45,7 +45,7 @@ class DBDM_Em_View {
     <form method="post" autocomplete="off">
         <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES | ENT_SUBSTITUTE); ?>">
         <div style="margin-bottom:14px;">
-            <input type="password" name="password" placeholder="Password emergency" autofocus required>
+            <input type="password" name="password" aria-label="Password emergency" placeholder="Password emergency" autofocus required>
         </div>
         <button type="submit" class="btn btn-primary" style="width:100%;">Accedi</button>
     </form>
@@ -303,7 +303,7 @@ class DBDM_Em_View {
 <style>
 :root {
     --bg:#0f1419; --panel:#1a1f2e; --panel-b:#2a3142;
-    --text:#e8e8e8; --muted:#8b95a7; --border:#2a3142;
+    --text:#e8e8e8; --muted:#9aa3b3; --border:#2a3142;
     --primary:#4a9eff; --danger:#ff5c5c; --warn:#ffb74a; --ok:#4ade80;
     --radius:8px;
 }
@@ -320,10 +320,10 @@ h2 { margin:0 0 12px; font-size:15px; font-weight:600; color:var(--text); }
 @media(max-width:720px){.grid{grid-template-columns:1fr;}}
 .btn { display:inline-block; background:var(--panel-b); color:var(--text); border:1px solid var(--border); padding:7px 14px; border-radius:6px; font-size:13px; cursor:pointer; text-decoration:none; font-family:inherit; }
 .btn:hover { background:#343c52; }
-.btn-primary { background:var(--primary); border-color:var(--primary); color:#fff; }
-.btn-primary:hover { background:#3a8fe0; }
-.btn-danger { background:var(--danger); border-color:var(--danger); color:#fff; }
-.btn-danger:hover { background:#e04040; }
+.btn-primary { background:#2563c9; border-color:#2563c9; color:#fff; }
+.btn-primary:hover { background:#1d5fbf; }
+.btn-danger { background:#c62828; border-color:#c62828; color:#fff; }
+.btn-danger:hover { background:#b71c1c; }
 .btn-warn { background:var(--warn); border-color:var(--warn); color:#000; }
 .btn-sm { padding:3px 10px; font-size:12px; }
 .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; }

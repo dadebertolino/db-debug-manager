@@ -166,4 +166,38 @@ class ConfigAndLogTest extends TestCase {
 			'log 0 stringa'             => array( true, '0', '/var/log/php-server.log', '{public}' ),
 		);
 	}
+
+	/**
+	 * Bug 44: un byte non UTF-8 rendeva vuoti viewer e risposta AJAX
+	 * (esc_html e json_encode restituiscono '' / false).
+	 */
+	public function test_testo_reso_utf8_valido(): void {
+		$latin = "caff\xE8 \xA8 ok";
+		$clean = DBDM_Log::to_utf8( $latin );
+
+		$this->assertSame( "caff\u{FFFD} \u{FFFD} ok", $clean );
+		$this->assertNotSame( '', esc_html( $clean ) );
+		$this->assertNotFalse( json_encode( $clean ) );
+		$this->assertSame( "già valido <b>&amp;</b>", DBDM_Log::to_utf8( "già valido <b>&amp;</b>" ), 'testo valido invariato, entità comprese' );
+	}
+
+	public function test_tail_restituisce_utf8_valido(): void {
+		$log = DBDM_Log::public_path();
+		file_put_contents( $log, "uno\ndue \xFF\n" );
+		$this->assertSame( "uno\ndue \u{FFFD}", DBDM_Log::tail( 10 ) );
+		unlink( $log );
+	}
+
+	/* --- Bug 58: traduzioni -------------------------------------------------- */
+
+	public function test_dominio_e_catalogo_delle_traduzioni(): void {
+		$header = file_get_contents( DBDM_PLUGIN_FILE, false, null, 0, 2048 );
+		$this->assertMatchesRegularExpression( '/^\s*\*\s*Domain Path:\s*\/languages\s*$/m', $header );
+		$this->assertMatchesRegularExpression( "/load_plugin_textdomain\\(\\s*'db-debug-manager'/", file_get_contents( DBDM_PLUGIN_FILE ) );
+
+		$pot = DBDM_TEST_ROOT . '/languages/db-debug-manager.pot';
+		$this->assertFileExists( $pot );
+		$this->assertStringContainsString( 'msgid "Snapshot creato."', file_get_contents( $pot ) );
+		$this->assertStringContainsString( 'msgid "Pre-aggiornamento"', file_get_contents( $pot ), 'etichette degli snapshot traducibili' );
+	}
 }

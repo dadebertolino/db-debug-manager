@@ -22,8 +22,12 @@ npm sono fissate da `package-lock.json`.
 
 ## Run notturna
 
-Ogni notte alle 04:17 UTC (e a mano da *Actions → Nightly*): E2E su
-WordPress trunk e su PHP 8.4, integration su WordPress trunk.
+Ogni notte alle 04:17 UTC (e a mano da *Actions → Nightly*): E2E sulla
+matrice WordPress trunk × PHP 8.3, ultima release × PHP 8.3 e 8.4,
+WordPress 6.0 × PHP 8.1; integration su WordPress trunk. Ogni PR esegue gli
+E2E sulla configurazione di `.wp-env.json` e su WordPress 6.0 (il minimo
+dichiarato). Il multisite è coperto da integration (`WP_MULTISITE=1`) e
+unit (emergency su SQLite), non dagli E2E.
 
 ## Perché questa struttura
 
@@ -95,12 +99,26 @@ parte con le costanti di debug **spente**, come un sito in produzione.
 
 | Risorsa | A cosa serve |
 |---------|--------------|
-| `POST /?rest_route=/dbdm-e2e/v1/reset` | Ripristina `wp-config.php` dalla copia dorata (o ne scrive una variante: `wp_config`), cancella opzioni e transient `dbdm_*`, `debug.log` (o lo crea con `log`), le cartelle private; con `emergency` imposta password nota, abilitazione, token fisso della cartella privata, proxy. |
+| `POST /?rest_route=/dbdm-e2e/v1/reset` | Ripristina `wp-config.php` dalla copia dorata (o ne scrive una variante: `wp_config`), cancella opzioni e transient `dbdm_*`, `debug.log` (o lo crea con `log`), le cartelle private; con `emergency` imposta password nota, abilitazione, token fisso della cartella privata, proxy; con `broken` (`plugin` o `theme`) manda il sito in fatal a ogni richiesta; con `quote_plugin` attiva un plugin con un apostrofo nello slug. Ogni reset toglie plugin e temi `dbdm-e2e-*` e rimette il tema predefinito. |
+| `POST /?rest_route=/dbdm-e2e/v1/log-append` | Accoda a `debug.log` i byte passati in `base64` (anche UTF-8 non valido). |
 | `GET /?rest_route=/dbdm-e2e/v1/state` | Contenuto di `wp-config.php`, **valori effettivi delle costanti** (letti da una richiesta interna separata), permessi, `pdo_mysql`, versione PHP, `debug.log`, contenuto e permessi delle cartelle private, opzioni `dbdm_*`. |
 
 Varianti di `wp-config.php`: `golden` (come lo scrive wp-env, credenziali con
 `getenv_docker`) e `literal` (credenziali come stringhe). Le altre varianti
 del corpus si aggiungono con i bug che le riguardano.
+
+Le richieste della fixture (REST `dbdm-e2e` e lettura delle costanti)
+escludono il plugin e il tema rotti: anche a sito fermo si legge lo stato e
+si ripulisce.
+
+| Spec | Cosa prova |
+|------|------------|
+| `config-and-log.spec.js` | scrittura di `wp-config.php` dal pannello, backup, log privato |
+| `panel.spec.js` | viewer del log (aggiorna, auto-refresh, UTF-8, log che nasce dopo, sessione scaduta), download, avvisi |
+| `emergency-security.spec.js` | login, sessioni, rate limit in parallelo, proxy, cartella privata, snapshot |
+| `emergency-flows.spec.js` | slug con apostrofo, header di sicurezza, logout |
+| `broken-site.spec.js` | **sito rotto** da un plugin o dal tema, recuperato dall'emergency |
+| `a11y.spec.js` | axe-core WCAG 2.1 AA su ogni tab e su `emergency.php` |
 
 `emergency.php` si raggiunge su `/wp-content/plugins/db-debug-manager/emergency.php`
 (helper `EMERGENCY_URL`, `emergencyLogin()`), in contesti del browser senza

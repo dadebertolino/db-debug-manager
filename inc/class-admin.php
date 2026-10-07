@@ -87,6 +87,9 @@ class DBDM_Admin {
                 'confirm_clear' => __('Svuotare il debug.log? Operazione irreversibile.', 'db-debug-manager'),
                 'empty_log'     => __('Il log è vuoto.', 'db-debug-manager'),
                 'refreshing'    => __('Aggiornamento...', 'db-debug-manager'),
+                'no_log'        => __('Nessun log', 'db-debug-manager'),
+                'expired'       => __('Sessione scaduta: ricarica la pagina.', 'db-debug-manager'),
+                'failed'        => __('Aggiornamento non riuscito.', 'db-debug-manager'),
             ),
         ));
     }
@@ -125,15 +128,12 @@ class DBDM_Admin {
 
         $posted = isset($_POST['dbdm']) && is_array($_POST['dbdm']) ? array_map('sanitize_text_field', wp_unslash($_POST['dbdm'])) : array();
         $result = DBDM_Config::set_constants(self::constants_to_write($posted));
-        $errors = is_wp_error($result) ? array($result->get_error_message()) : array();
-
-        $redirect = self::page_url(array(
-            'tab'     => 'config',
-            'updated' => empty($errors) ? '1' : '0',
-            'err'     => !empty($errors) ? rawurlencode(implode(' | ', $errors)) : null,
-        ));
-
-        wp_safe_redirect($redirect);
+        if (is_wp_error($result)) {
+            self::flash('error', $result->get_error_message());
+        } else {
+            self::flash('success', __('Impostazioni salvate. Ricarica la pagina per vedere lo stato aggiornato.', 'db-debug-manager'));
+        }
+        wp_safe_redirect(self::page_url(array('tab' => 'config', 'updated' => is_wp_error($result) ? '0' : '1')));
         exit;
     }
 
@@ -180,19 +180,45 @@ class DBDM_Admin {
         return $out;
     }
 
+    /**
+     * Avviso da mostrare alla prossima pagina del pannello, per l'utente
+     * corrente. 2.0.0 (bug 48, 54): gli esiti li decide l'handler; la query
+     * string non porta più testi (prima ?err= mostrava qualunque contenuto).
+     *
+     * @param string $type success | warning | error.
+     * @param string $message
+     */
+    public static function flash($type, $message) {
+        $key   = 'dbdm_notices_' . get_current_user_id();
+        $list  = get_transient($key);
+        $list  = is_array($list) ? $list : array();
+        $list[] = array(in_array($type, array('success', 'warning', 'error'), true) ? $type : 'error', (string) $message);
+        set_transient($key, $list, 5 * MINUTE_IN_SECONDS);
+    }
+
+    /**
+     * Avvisi in attesa per l'utente corrente, poi cancellati.
+     *
+     * @return array[]
+     */
+    public static function take_notices() {
+        $key  = 'dbdm_notices_' . get_current_user_id();
+        $list = get_transient($key);
+        delete_transient($key);
+        return is_array($list) ? $list : array();
+    }
+
     public function handle_clear_log() {
         if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
         check_admin_referer('dbdm_clear_log');
 
         $result = DBDM_Log::clear();
-        $args = array(
-            'tab'     => 'log',
-            'cleared' => is_wp_error($result) ? '0' : '1',
-        );
         if (is_wp_error($result)) {
-            $args['err'] = rawurlencode($result->get_error_message());
+            self::flash('error', $result->get_error_message());
+        } else {
+            self::flash('success', __('Log svuotato.', 'db-debug-manager'));
         }
-        wp_safe_redirect(self::page_url($args));
+        wp_safe_redirect(self::page_url(array('tab' => 'log')));
         exit;
     }
 
@@ -205,11 +231,9 @@ class DBDM_Admin {
             wp_die(esc_html__('Nessun log disponibile.', 'db-debug-manager'));
         }
 
-        nocache_headers();
-        header('Content-Type: text/plain; charset=utf-8');
-        header('Content-Disposition: attachment; filename="debug-' . gmdate('Ymd-His') . '.log"');
-        header('Content-Length: ' . filesize($path));
-        readfile($path);
+        if (!DBDM_Log::send_download($path, 'debug-' . gmdate('Ymd-His') . '.log')) {
+            wp_die(esc_html__('Log non leggibile.', 'db-debug-manager'));
+        }
         exit;
     }
 
@@ -243,10 +267,8 @@ class DBDM_Admin {
         // Rimozione totale.
         if (isset($_POST['dbdm_action']) && $_POST['dbdm_action'] === 'clear') {
             DBDM_Emergency::clear_password();
-            wp_safe_redirect(self::page_url(array(
-                'tab'  => 'emergency',
-                'em_cleared' => '1',
-            )));
+            self::flash('success', __('Password emergency rimossa e accesso disattivato.', 'db-debug-manager'));
+            wp_safe_redirect(self::page_url(array('tab' => 'emergency')));
             exit;
         }
 
@@ -271,14 +293,12 @@ class DBDM_Admin {
         // Modalità proxy fidato (indipendente dagli errori password).
         DBDM_Emergency::set_trust_proxy(!empty($_POST['dbdm_trust_proxy']));
 
-        $args = array(
-            'tab'  => 'emergency',
-            'em_saved' => empty($errors) ? '1' : '0',
-        );
-        if (!empty($errors)) {
-            $args['err'] = rawurlencode(implode(' | ', $errors));
+        if ($errors) {
+            self::flash('error', implode(' | ', $errors));
+        } else {
+            self::flash('success', __('Impostazioni emergency salvate.', 'db-debug-manager'));
         }
-        wp_safe_redirect(self::page_url($args));
+        wp_safe_redirect(self::page_url(array('tab' => 'emergency')));
         exit;
     }
 
@@ -286,10 +306,8 @@ class DBDM_Admin {
         if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
         check_admin_referer('dbdm_clear_emergency_log');
         DBDM_Emergency::clear_log();
-        wp_safe_redirect(self::page_url(array(
-            'tab'  => 'emergency',
-            'em_log_cleared' => '1',
-        )));
+        self::flash('success', __('Log emergency svuotato.', 'db-debug-manager'));
+        wp_safe_redirect(self::page_url(array('tab' => 'emergency')));
         exit;
     }
 
@@ -300,13 +318,12 @@ class DBDM_Admin {
         $note = isset($_POST['note']) ? sanitize_text_field(wp_unslash($_POST['note'])) : '';
         $id = DBDM_Snapshots::create(DBDM_Snapshots::TRIGGER_MANUAL, $note);
 
-        $args = array('tab' => 'snapshots');
         if (is_wp_error($id)) {
-            $args['snap_err'] = rawurlencode($id->get_error_message());
+            self::flash('error', $id->get_error_message());
         } else {
-            $args['snap_created'] = '1';
+            self::flash('success', __('Snapshot creato.', 'db-debug-manager'));
         }
-        wp_safe_redirect(self::page_url($args));
+        wp_safe_redirect(self::page_url(array('tab' => 'snapshots')));
         exit;
     }
 
@@ -315,11 +332,15 @@ class DBDM_Admin {
         check_admin_referer('dbdm_delete_snapshot');
 
         $id = isset($_POST['id']) ? sanitize_text_field(wp_unslash($_POST['id'])) : '';
-        if ($id) DBDM_Snapshots::delete($id);
-
-        wp_safe_redirect(self::page_url(array(
-            'tab' => 'snapshots', 'snap_deleted' => '1',
-        )));
+        // 2.0.0 (bug 48): "eliminato" solo se lo snapshot c'era ed è stato tolto.
+        if (!$id || !DBDM_Snapshots::get_by_id($id)) {
+            self::flash('error', __('Snapshot non trovato.', 'db-debug-manager'));
+        } elseif (!DBDM_Snapshots::delete($id)) {
+            self::flash('error', __('Impossibile scrivere file snapshot.', 'db-debug-manager'));
+        } else {
+            self::flash('success', __('Snapshot eliminato.', 'db-debug-manager'));
+        }
+        wp_safe_redirect(self::page_url(array('tab' => 'snapshots')));
         exit;
     }
 
@@ -333,30 +354,30 @@ class DBDM_Admin {
         if (!empty($_POST['restore_theme']))   $parts[] = 'theme';
 
         if (!$id || empty($parts)) {
-            wp_safe_redirect(self::page_url(array(
-                'tab' => 'snapshots',
-                'snap_err' => rawurlencode(__('Seleziona almeno una parte da ripristinare.', 'db-debug-manager')),
-            )));
+            self::flash('error', __('Seleziona almeno una parte da ripristinare.', 'db-debug-manager'));
+            wp_safe_redirect(self::page_url(array('tab' => 'snapshots')));
             exit;
         }
 
-        $messages = DBDM_Snapshots::restore($id, $parts);
-        // Passa i messaggi via transient (evita URL lunghi).
-        set_transient('dbdm_restore_msgs_' . get_current_user_id(), $messages, 60);
-
-        wp_safe_redirect(self::page_url(array(
-            'tab' => 'snapshots', 'snap_restored' => '1',
-        )));
+        // 2.0.0 (bug 48): solo gli esiti reali del ripristino, niente
+        // "Ripristino completato" anche in caso di errore.
+        $map = array('ok' => 'success', 'warn' => 'warning', 'err' => 'error');
+        foreach (DBDM_Snapshots::restore($id, $parts) as $msg) {
+            self::flash(isset($map[$msg[0]]) ? $map[$msg[0]] : 'error', $msg[1]);
+        }
+        wp_safe_redirect(self::page_url(array('tab' => 'snapshots')));
         exit;
     }
 
     public function handle_clear_snapshots() {
         if (!current_user_can(self::cap())) wp_die(esc_html__('Permessi insufficienti.', 'db-debug-manager'));
         check_admin_referer('dbdm_clear_snapshots');
-        DBDM_Snapshots::delete_all();
-        wp_safe_redirect(self::page_url(array(
-            'tab' => 'snapshots', 'snap_cleared' => '1',
-        )));
+        if (DBDM_Snapshots::delete_all()) {
+            self::flash('success', __('Tutti gli snapshot eliminati.', 'db-debug-manager'));
+        } else {
+            self::flash('error', __('Impossibile scrivere file snapshot.', 'db-debug-manager'));
+        }
+        wp_safe_redirect(self::page_url(array('tab' => 'snapshots')));
         exit;
     }
 
