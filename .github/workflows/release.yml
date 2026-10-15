@@ -13,7 +13,7 @@ jobs:
     name: "Build ZIP e pubblica Release"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Verifica coerenza versione tag / plugin
         run: |
@@ -41,7 +41,7 @@ jobs:
           fi
 
       - name: Crea/aggiorna Release con lo ZIP
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: db-debug-manager-*.zip
           generate_release_notes: true
